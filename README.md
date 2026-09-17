@@ -127,3 +127,15 @@ go test -v .
 1. **Adopt Approach B as the canonical migration standard** for `gittuf migrate sha256`.
 2. **Support Approach C attestations** for enterprise repositories requiring cryptographic bridge verification across archives.
 3. Fix `ZeroHash` in `pkg/gitinterface/hash.go` to dynamically respect `core.repositoryformatversion`.
+
+## 7. Advanced Security Evaluations (Negative & Transparency Tests)
+
+To ensure production readiness and address strict enterprise security requirements, this repository includes two advanced evaluations beyond standard happy-path migrations:
+
+### 1. The Hacker Tamper Test (Negative Evaluation)
+* **Threat Model:** A malicious actor attempts to inject forged historical commits by mutating values inside `snapshot-manifest.json` (such as `rsl_chain_merkle_hash`).
+* **Evaluation:** The verification suite verifies that tampered values trigger a strict, immediate **fail-closed** rejection, preventing silent pass vulnerabilities.
+
+### 2. Privacy-Safe OID Commitment (Sigstore / Rekor Public Transparency Anchor)
+* **Privacy Challenge:** Public transparency logs must not expose sensitive enterprise branch names (e.g. `secret-feature-x`) or internal developer email addresses.
+* **Architecture:** Uses a zero-leakage `PrivacySafeRekorPayload` containing strictly cryptographic Object IDs (OIDs) and the Merkle root hash. External auditors can mathematically verify provenance without accessing private Git namespaces.

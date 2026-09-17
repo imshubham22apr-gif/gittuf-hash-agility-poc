@@ -104,3 +104,47 @@ func TestExecCmdFailure(t *testing.T) {
 		t.Errorf("expected error for non-existent command, got nil")
 	}
 }
+
+func TestHackerTamperDetection(t *testing.T) {
+	manifest := &SnapshotManifest{
+		SchemaVersion: "gap1-poc-v1",
+		FrozenAt:      time.Now().UTC(),
+		SHA1RepoHead:  "e9afffcce72f4dad92289589f980d5840b4d100b",
+		RSLTip:        "d00b97620b6dfcea58d32bc18415d5aac41f9c13",
+		RSLEntryCount: 3,
+		RSLChainHash:  "fac4be007988639392d02280033aa66cc2fc2696694e5b81294c0bd98b0e0e61",
+		MigrationNote: "Snapshot test manifest",
+		SignedBy:      "test-key-id",
+	}
+
+	result := RunHackerTamperTest(t.TempDir(), manifest)
+	if result.Verdict != "NEGATIVE TEST (TAMPER RESISTANCE): SnapshotManifest cryptographic anchor successfully rejected corrupted state." {
+		t.Errorf("expected tamper resistance verdict, got: %s", result.Verdict)
+	}
+
+	for _, f := range result.Findings {
+		if !f.Passed {
+			t.Errorf("tamper finding failed: %s", f.Description)
+		}
+	}
+}
+
+func TestPrivacySafeRekorSimulation(t *testing.T) {
+	manifest := &SnapshotManifest{
+		SchemaVersion: "gap1-poc-v1",
+		FrozenAt:      time.Now().UTC(),
+		SHA1RepoHead:  "e9afffcce72f4dad92289589f980d5840b4d100b",
+		RSLTip:        "d00b97620b6dfcea58d32bc18415d5aac41f9c13",
+		RSLEntryCount: 3,
+		RSLChainHash:  "fac4be007988639392d02280033aa66cc2fc2696694e5b81294c0bd98b0e0e61",
+		MigrationNote: "Snapshot test manifest",
+		SignedBy:      "test-key-id",
+	}
+
+	result := RunPrivacySafeRekorSimulation(t.TempDir(), manifest)
+	for _, f := range result.Findings {
+		if !f.Passed {
+			t.Errorf("rekor simulation finding failed: %s", f.Description)
+		}
+	}
+}
