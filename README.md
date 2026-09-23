@@ -11,6 +11,8 @@
 
 Git is actively transitioning from SHA-1 to SHA-256. Gittuf relies on signed metadata (the Reference State Log / RSL and TUF policies) containing embedded Git object hashes.
 
+For a quick‑start guide on the new GAP‑1 commands, see the [CLI usage guide](docs/cli_usage.md).
+
 This Proof of Concept (PoC) evaluates three architectural solutions to hash agility:
 
 ```

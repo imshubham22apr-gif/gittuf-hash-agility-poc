@@ -8,3 +8,4 @@ archives/
 *.test
 .DS_Store
 Thumbs.db
+gittuf-upstream/
