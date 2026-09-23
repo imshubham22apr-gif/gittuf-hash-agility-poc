@@ -116,9 +116,14 @@ func TestEnsureNoCompatObjectFormat(t *testing.T) {
 		assert.Equal(t, ObjectFormatSHA1, repo.GetCompatObjectFormat())
 
 		loadedRepo, err := LoadRepository(tmpDir)
-		assert.Nil(t, err)
-		assert.True(t, loadedRepo.IsCompatMode())
-		assert.Equal(t, ObjectFormatSHA1, loadedRepo.GetCompatObjectFormat())
+		if err != nil {
+			// Some Git builds (e.g. macOS / FreeBSD default git) do not compile with
+			// compatibility hash algorithm support (requires Rust) and fail on rev-parse.
+			assert.ErrorContains(t, err, "compatibility hash algorithm support requires Rust")
+		} else {
+			assert.True(t, loadedRepo.IsCompatMode())
+			assert.Equal(t, ObjectFormatSHA1, loadedRepo.GetCompatObjectFormat())
+		}
 	})
 
 	t.Run("missing config", func(t *testing.T) {
