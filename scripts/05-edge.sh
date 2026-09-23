@@ -60,18 +60,33 @@ fi
 echo "--------------------------------------------------------"
 echo "PROBE 3: Retaining Signed Tags in SHA-256"
 echo "--------------------------------------------------------"
-echo "HYPOTHESIS: git fast-export without --signed-tags=strip will fail during import, or silently strip the signature, because the signature is over the SHA-1 text."
-rm -rf work/new-repo-signedtags
-git init --object-format=sha256 work/new-repo-signedtags
-if git -C work/old-repo fast-export --all | git -C work/new-repo-signedtags fast-import > /dev/null 2> work/probe3-err.txt; then
-  echo "RESULT 3: Import succeeded. Checking tag signature..."
-  # Check tag v1.0.0
-  git -C work/new-repo-signedtags verify-tag v1.0.0 2> work/probe3-verify.txt || git -C work/new-repo-signedtags verify-tag v1.0 2> work/probe3-verify.txt || true
-  cat work/probe3-verify.txt
-else
-  echo "RESULT 3: Import FAILED:"
-  cat work/probe3-err.txt
-fi
+echo "HYPOTHESIS: The SSH signature on v1.0.0 covers the SHA-1 tag text (including the 40-char 'object' line). Default fast-export refuses signed tags; 'strip' drops the signature; 'verbatim' keeps the signature bytes, but they no longer verify because the tag text now names a SHA-256 object."
+ALLOWED_TAGS="$(pwd)/work/allowed_signers_tags"
+
+echo "[CMD] git verify-tag v1.0.0 in work/old-repo (SHA-1 control)"
+git -C work/old-repo -c gpg.ssh.allowedSignersFile="${ALLOWED_TAGS}" verify-tag v1.0.0
+echo "EXIT: $?"
+
+echo "[CMD] git fast-export --all (default --signed-tags mode)"
+git -C work/old-repo fast-export --all > /dev/null
+echo "EXIT: $?"
+
+for MODE in strip verbatim; do
+  REPO="work/new-repo-signedtags-${MODE}"
+  rm -rf "${REPO}"
+  git init -q --object-format=sha256 "${REPO}"
+  echo "[CMD] fast-export --signed-tags=${MODE} | fast-import (SHA-256)"
+  git -C work/old-repo fast-export --all --signed-tags=${MODE} | git -C "${REPO}" fast-import --quiet
+  echo "EXIT: $?"
+  if git -C "${REPO}" cat-file -p v1.0.0 | grep -q -- "-----BEGIN SSH SIGNATURE-----"; then
+    echo "RESULT 3 (${MODE}): signature block PRESENT in imported tag object"
+  else
+    echo "RESULT 3 (${MODE}): signature block ABSENT in imported tag object"
+  fi
+  echo "[CMD] git verify-tag v1.0.0 in ${REPO}"
+  git -C "${REPO}" -c gpg.ssh.allowedSignersFile="${ALLOWED_TAGS}" verify-tag v1.0.0
+  echo "EXIT: $?"
+done
 
 echo "--------------------------------------------------------"
 echo "PROBE 4: Snapshot Determinism"

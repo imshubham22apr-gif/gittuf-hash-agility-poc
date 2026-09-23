@@ -1,53 +1,53 @@
 ======================================================================
  PHASE 1: PRE-MIGRATION REPOSITORY FREEZE & SNAPSHOT COMMITMENT
- Date: 2026-09-23T06:03:41Z
+ Date: 2026-09-23T13:11:30Z
 ======================================================================
 
 === Step 1: Computing OID-Only Commitment ===
-Root Key Fingerprint: SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
+Root Key Fingerprint: SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
 --- OID Commitment Content (work/oid-commitment.txt) ---
-1e73ba090dc2cd3a6166866ab81f36ae8965d532
-984eb14257364893a4b23a18cb1d01945cc8e448
-SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
-dc046aabb690d3c16f177ca78f7ec2eca9fd2848
-dfd68d283ac1c418771ea48bfe62cc9a6151df1e
+099955f512e3899fbcb04d0a3b36d2b8291aa431
+59a899af00c36c08d74d6d29c166fadc60cf7cbe
+6eb6dd009eb791430e5fb4b69f4333b82c70d5e8
+6ee002a59681509586feb316fe18f98c38e66d26
+SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
 --------------------------------------------------------
-Commitment SHA-256: 147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35
+Commitment SHA-256: 04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2
 
 === Step 2: Creating Git Bundle (archives/old-repo.bundle) ===
-Bundle SHA-256: 076a5497dc84b4a72a35eb341a9feee4b04c64f08ed610b42ef07dd867cb9119
+Bundle SHA-256: 5e5f69d57ed1c9e0a8007beb19bf29ce436c3b36ae8a79da1510ee1f7696a431
 
 === Step 3: Generating archives/snapshot-manifest.json ===
 --- Snapshot Manifest (archives/snapshot-manifest.json) ---
 {
   "schema_version": "gap1-poc-v1",
-  "frozen_at": "2026-09-23T06:03:42Z",
-  "sha1_repo_head": "984eb14257364893a4b23a18cb1d01945cc8e448",
-  "rsl_tip": "1e73ba090dc2cd3a6166866ab81f36ae8965d532",
-  "policy_oid": "dc046aabb690d3c16f177ca78f7ec2eca9fd2848",
-  "bundle_sha256": "076a5497dc84b4a72a35eb341a9feee4b04c64f08ed610b42ef07dd867cb9119",
-  "commitment_sha256": "147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35",
-  "root_key_fingerprint": "SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8"
+  "frozen_at": "2026-09-23T13:11:33Z",
+  "sha1_repo_head": "59a899af00c36c08d74d6d29c166fadc60cf7cbe",
+  "rsl_tip": "099955f512e3899fbcb04d0a3b36d2b8291aa431",
+  "policy_oid": "6ee002a59681509586feb316fe18f98c38e66d26",
+  "bundle_sha256": "5e5f69d57ed1c9e0a8007beb19bf29ce436c3b36ae8a79da1510ee1f7696a431",
+  "commitment_sha256": "04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2",
+  "root_key_fingerprint": "SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0"
 }
 -----------------------------------------------------------
 
 === Step 4: Signing Manifest with Root Key (ssh-keygen -Y sign) ===
-Signing file /d/OneDrive/Desktop/GITTUF/archives/snapshot-manifest.json
-Write signature to /d/OneDrive/Desktop/GITTUF/archives/snapshot-manifest.json.sig
-Signature generated: /d/OneDrive/Desktop/GITTUF/archives/snapshot-manifest.json.sig
+Signing file /c/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/archives/snapshot-manifest.json
+Write signature to /c/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/archives/snapshot-manifest.json.sig
+Signature generated: /c/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/archives/snapshot-manifest.json.sig
 Verifying signature with ssh-keygen -Y verify...
-Good "file" signature for root-key with ED25519 key SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
+Good "file" signature for root-key with ED25519 key SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
 [PASS] Root key signature verified successfully (Exit: 0)
 
 === Step 5: Optional RFC 3161 Timestamp (freetsa.org) ===
-[INFO] RFC 3161 timestamp acquired from freetsa.org and saved to /d/OneDrive/Desktop/GITTUF/archives/snapshot-manifest.tsr
+[INFO] timestamp: skipped (offline mode; set TIMESTAMP=1 to request one from freetsa.org)
 
 === Step 6: Determinism Verification (Recompute Twice) ===
-Original Hash:  147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35
-Recompute Run1: 147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35
-Recompute Run2: 147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35
+Original Hash:  04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2
+Recompute Run1: 04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2
+Recompute Run2: 04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2
 [PASS] Determinism proof verified: byte-identical commitment hash across all runs.
 
 ======================================================================
- PHASE 1 COMPLETE. LOG SAVED TO /d/OneDrive/Desktop/GITTUF/results/02-snapshot.txt
+ PHASE 1 COMPLETE. LOG SAVED TO /c/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/results/02-snapshot.txt
 ======================================================================

@@ -48,7 +48,8 @@ func main() {
 
 	command := os.Args[1]
 
-	if command == "pae" || command == "envelope" || command == "payload" {
+	switch command {
+	case "pae", "envelope", "payload":
 		if len(os.Args) < 4 {
 			fmt.Println("Usage: dsse-helper pae|envelope|payload <sha1> <sha256> [keyID] [sigFile]")
 			os.Exit(1)
@@ -99,7 +100,7 @@ func main() {
 			keyID := os.Args[4]
 			sigFile := os.Args[5]
 
-			sigBytes, err := os.ReadFile(sigFile)
+			sigBytes, err := os.ReadFile(sigFile) //nolint:gosec // path is supplied by the operator on the command line
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading sig file: %v\n", err)
 				os.Exit(1)
@@ -122,12 +123,12 @@ func main() {
 			}
 			fmt.Println(string(envBytes))
 		}
-	} else if command == "tamper" {
+	case "tamper":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: dsse-helper tamper <envelope_file>")
 			os.Exit(1)
 		}
-		envBytes, err := os.ReadFile(os.Args[2])
+		envBytes, err := os.ReadFile(os.Args[2]) //nolint:gosec // path is supplied by the operator on the command line
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading envelope: %v\n", err)
 			os.Exit(1)
@@ -166,12 +167,12 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(string(outBytes))
-	} else if command == "extract" {
+	case "extract":
 		if len(os.Args) < 5 {
 			fmt.Println("Usage: dsse-helper extract <envelope_file> <sig_out> <payload_out>")
 			os.Exit(1)
 		}
-		envBytes, err := os.ReadFile(os.Args[2])
+		envBytes, err := os.ReadFile(os.Args[2]) //nolint:gosec // path is supplied by the operator on the command line
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading envelope: %v\n", err)
 			os.Exit(1)
@@ -185,13 +186,19 @@ func main() {
 		if len(env.Signatures) > 0 {
 			sigBytes, err := base64.StdEncoding.DecodeString(env.Signatures[0].Sig)
 			if err == nil {
-				os.WriteFile(os.Args[3], sigBytes, 0644)
+				if err := os.WriteFile(os.Args[3], sigBytes, 0o600); err != nil { //nolint:gosec // path is supplied by the operator on the command line
+					fmt.Fprintf(os.Stderr, "Error writing sig file: %v\n", err)
+					os.Exit(1)
+				}
 			}
 		}
 
 		payloadBytes, err := base64.StdEncoding.DecodeString(env.Payload)
 		if err == nil {
-			os.WriteFile(os.Args[4], payloadBytes, 0644)
+			if err := os.WriteFile(os.Args[4], payloadBytes, 0o600); err != nil { //nolint:gosec // path is supplied by the operator on the command line
+				fmt.Fprintf(os.Stderr, "Error writing payload file: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	}
 }

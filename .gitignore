@@ -3,6 +3,19 @@ keys/
 work/
 archives/
 
+# Loose SSH key files generated during PoC runs — never commit private keys
+root
+root.pub
+dev
+dev.pub
+
+# Throwaway test/demo repos created during local PoC exploration
+old-repo/
+test-clean-repo/
+demo-repo/
+fresh-repo/
+test-sync-repo/
+
 # Environment and OS artifacts
 *.exe
 *.test

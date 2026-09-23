@@ -17,17 +17,23 @@ ssh-keygen -Y sign -n git -f keys/root work/pae.txt
 echo "[3] Building DSSE JSON envelope..."
 go run scripts/04-dsse-helper.go envelope $SHA1_HEAD $SHA256_HEAD keys/root.pub work/pae.txt.sig > work/hash-equivalence.json
 
-echo "[4] Pushing to refs/gittuf/attestations in new SHA-256 repository..."
+echo "[4] Adding to refs/gittuf/attestations in new SHA-256 repository..."
 cd work/new-repo-attest
-BLOB=$(git hash-object -w ../hash-equivalence.json)
-TREE=$(printf "100644 blob %s\thash-equivalence.json\n" "$BLOB" | git mktree)
-COMMIT=$(git commit-tree $TREE -m "Add hash equivalence attestation")
+BLOB=$(git hash-object -w --no-filters ../hash-equivalence.json)
+# Keep existing entries (e.g. hash-migration/ from Scenario D) and chain on the current tip.
+PARENT=$(git rev-parse refs/gittuf/attestations)
+TREE=$( { git ls-tree "$PARENT" | grep -v "	hash-equivalence.json$" || true; printf "100644 blob %s\thash-equivalence.json\n" "$BLOB"; } | git mktree)
+COMMIT=$(git commit-tree $TREE -p $PARENT -m "Add hash equivalence attestation")
 git update-ref refs/gittuf/attestations $COMMIT
+gittuf rsl record refs/gittuf/attestations --local-only
+echo "    -> Committed as $COMMIT; tree now contains:"
+git ls-tree $COMMIT
+echo "    -> gittuf verify-ref main (gittuf does not read hash-equivalence.json; this checks it is tolerated):"
+gittuf verify-ref main
 cd ../..
-echo "    -> Committed as $COMMIT"
 
 echo "--------------------------------------------------------"
-echo "[5] VERIFICATION (Positive Test)"
+echo "[5] VERIFICATION (Positive Test) -- done by ssh-keygen over the DSSE PAE, not by gittuf"
 echo "--------------------------------------------------------"
 git -C work/new-repo-attest show refs/gittuf/attestations:hash-equivalence.json > work/extracted.json
 

@@ -31,7 +31,7 @@ func (co *createOptions) AddFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired("sha256-head")
 }
 
-func (co *createOptions) Run(cmd *cobra.Command, args []string) error {
+func (co *createOptions) Run(cmd *cobra.Command, _ []string) error {
 	cmd.Printf("Creating GAP-1 Genesis Bridge record...\n")
 
 	bridge, err := gitinterface.NewGenesisBridge(
@@ -67,7 +67,7 @@ func (vo *verifyOptions) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (vo *verifyOptions) Run(cmd *cobra.Command, args []string) error {
+func (vo *verifyOptions) Run(cmd *cobra.Command, _ []string) error {
 	bridge, err := gitinterface.LoadGenesisBridge(vo.bridgeFile)
 	if err != nil {
 		return fmt.Errorf("failed to load genesis bridge: %w", err)

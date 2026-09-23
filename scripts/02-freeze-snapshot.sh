@@ -120,7 +120,10 @@ echo
 # 5. Optional RFC 3161 timestamp
 echo "=== Step 5: Optional RFC 3161 Timestamp (freetsa.org) ==="
 TS_TOKEN="${ARCHIVES_DIR}/snapshot-manifest.tsr"
-if command -v openssl &>/dev/null && command -v curl &>/dev/null; then
+rm -f "${TS_TOKEN}"
+if [ "${TIMESTAMP:-0}" != "1" ]; then
+    echo "[INFO] timestamp: skipped (offline mode; set TIMESTAMP=1 to request one from freetsa.org)"
+elif command -v openssl &>/dev/null && command -v curl &>/dev/null; then
     TS_QUERY="${WORK_DIR}/manifest.tsq"
     openssl ts -query -data "${MANIFEST_FILE}" -no_nonce -sha256 -cert -out "${TS_QUERY}" 2>/dev/null || true
     if [ -f "${TS_QUERY}" ]; then

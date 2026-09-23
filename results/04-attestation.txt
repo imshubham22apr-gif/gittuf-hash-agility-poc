@@ -1,15 +1,19 @@
 === Phase 3: Hash-Equivalence Attestation (Approach C) ===
-[1] Generating DSSE PAE and payload for 984eb14257364893a4b23a18cb1d01945cc8e448 -> 1757f76331894752532184969f97d5541d7d5f4aa83e4b12ca6a0b67ae6b5071...
+[1] Generating DSSE PAE and payload for 59a899af00c36c08d74d6d29c166fadc60cf7cbe -> 523a0d39af1763aaf2f60ce6b5c4036308d1f59c45aec6d3480c18c4b269af86...
+go: downloading go1.27.0 (windows/amd64)
 [2] Signing PAE with old root key (gittuf native format)...
 Signing file work/pae.txt
 Write signature to work/pae.txt.sig
 [3] Building DSSE JSON envelope...
-[4] Pushing to refs/gittuf/attestations in new SHA-256 repository...
-    -> Committed as 63f5c70541571803199f40486f35524ebbd43241d3dd49419d493fb96bcbdae5
+[4] Adding to refs/gittuf/attestations in new SHA-256 repository...
+    -> Committed as 89344d631915a84278d2c329a0480284807b04832752deb65fcb50fff5d4cd56; tree now contains:
+100644 blob c242e02c27c39306bb7f257d976b73cc1e94c1db149a69e26b7ea37034d0a1e3	hash-equivalence.json
+040000 tree abf8485ca0b929eccc93d011a1fc057387cbc13e36f37b5d507afb14a0e5b505	hash-migration
+    -> gittuf verify-ref main (gittuf does not read hash-equivalence.json; this checks it is tolerated):
 --------------------------------------------------------
-[5] VERIFICATION (Positive Test)
+[5] VERIFICATION (Positive Test) -- done by ssh-keygen over the DSSE PAE, not by gittuf
 --------------------------------------------------------
-Good "git" signature for root with ED25519 key SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
+Good "git" signature for root with ED25519 key SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
     -> Verification SUCCESSFUL
 --------------------------------------------------------
 [6] VERIFICATION (Negative Tamper Test)

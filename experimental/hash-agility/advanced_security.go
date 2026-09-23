@@ -65,7 +65,7 @@ func VerifyManifestSignature(manifestPath, sigPath, pubKeyPath, workDir string) 
 
 	allowedSignersPath := filepath.Join(workDir, "allowed_signers_go")
 	allowedSignersContent := fmt.Sprintf("root-key %s", string(pubKeyBytes))
-	if err := os.WriteFile(allowedSignersPath, []byte(allowedSignersContent), 0o644); err != nil {
+	if err := os.WriteFile(allowedSignersPath, []byte(allowedSignersContent), 0o600); err != nil { //nolint:gosec // path is built from the test work directory
 		return false, fmt.Sprintf("cannot write allowed_signers: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func RunHackerTamperTest(workDir, manifestPath, sigPath, pubKeyPath string) *Sec
 	}
 
 	tamperedPath := filepath.Join(workDir, "tampered-manifest.json")
-	if err := os.WriteFile(tamperedPath, tamperedData, 0o644); err != nil {
+	if err := os.WriteFile(tamperedPath, tamperedData, 0o600); err != nil { //nolint:gosec // path is built from the test work directory
 		result.Findings = append(result.Findings, SecurityFinding{
 			Description: fmt.Sprintf("Cannot write tampered manifest: %v", err),
 			Passed:      false,
@@ -194,7 +194,7 @@ func ComputeContentSHA256(repoPath string) (string, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("git cat-file failed: %v", err)
+		return "", fmt.Errorf("git cat-file failed: %w", err)
 	}
 
 	// Sort and deduplicate (same as bash: LC_ALL=C sort -u)
@@ -260,7 +260,7 @@ func GenerateRekorPayload(manifest *SecurityManifest) (*PrivacySafeRekorPayload,
 func SaveRekorPayload(payload *PrivacySafeRekorPayload, outputPath string) error {
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal: %v", err)
+		return fmt.Errorf("failed to marshal: %w", err)
 	}
-	return os.WriteFile(outputPath, data, 0o644)
+	return os.WriteFile(outputPath, data, 0o644) //nolint:gosec // published record, intended to be world-readable
 }

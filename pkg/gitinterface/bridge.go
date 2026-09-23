@@ -9,13 +9,13 @@
 // verifiers to establish a chain of trust across the hash epoch boundary.
 //
 // Motivation (GAP-1 / Patrick P3):
-//   When a gittuf repository migrates from SHA-1 to SHA-256 object format,
-//   the entire RSL history is re-written in SHA-256. Without an explicit
-//   bridge, there is no verifiable link between the old and new epochs.
+//
+//	When a gittuf repository migrates from SHA-1 to SHA-256 object format,
+//	the entire RSL history is re-written in SHA-256. Without an explicit
+//	bridge, there is no verifiable link between the old and new epochs.
 //
 // The bridge record is stored as a JSON file in refs/gittuf/snapshots/<ts>
 // and optionally anchored in Sigstore Rekor for public verifiability.
-
 package gitinterface
 
 import (
@@ -141,7 +141,7 @@ func WriteGenesisBridge(bridge *GenesisBridgeRecord, outputPath string) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal bridge record: %w", err)
 	}
-	return os.WriteFile(outputPath, data, 0o644)
+	return os.WriteFile(outputPath, data, 0o644) //nolint:gosec // published record, intended to be world-readable
 }
 
 // LoadGenesisBridge reads and parses a GenesisBridgeRecord from disk.

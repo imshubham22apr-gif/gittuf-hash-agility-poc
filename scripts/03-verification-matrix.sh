@@ -16,7 +16,7 @@ RESULTS_DIR="${POC_ROOT}/results"
 mkdir -p "${RESULTS_DIR}" "${WORK_DIR}"
 
 # Locate gittuf binary
-GITTUF_BIN="$(command -v gittuf 2>/dev/null || true)"
+GITTUF_BIN="${GITTUF:-$(command -v gittuf 2>/dev/null || true)}"
 if [ -z "${GITTUF_BIN}" ]; then
     CURRENT_USER="${USER:-${USERNAME:-}}"
     for candidate in \
@@ -32,6 +32,10 @@ if [ -z "${GITTUF_BIN}" ]; then
             break
         fi
     done
+fi
+if [ -z "${GITTUF_BIN}" ]; then
+    echo "gittuf not found; set GITTUF=/path/to/gittuf" >&2
+    exit 2
 fi
 
 echo "======================================================================"
@@ -80,8 +84,18 @@ mkdir -p "${NAIVE_REPO}"
     echo "[CMD] fast-export from old-repo | fast-import into new-repo-naive"
     (cd "${OLD_REPO}" && git fast-export --all --signed-tags=strip) | git fast-import
 
-    echo "[CMD] Fetching refs/gittuf/* from old-repo (naive copy)"
-    git fetch "${OLD_REPO}" "refs/gittuf/*:refs/gittuf/*" || true
+    # EXPECTED FAILURE (fail-closed layer 1): Git refuses to fetch between a
+    # SHA-1 and a SHA-256 repository. The refs/gittuf/* history is present in
+    # this repo anyway, because `fast-export --all` above already re-imported
+    # it: the RSL commits get new SHA-256 IDs, but the target IDs written in
+    # their messages stay 40-char SHA-1. That is what verify-ref trips on
+    # below (fail-closed layer 2).
+    echo "[CMD] Fetching refs/gittuf/* from old-repo (naive copy, EXPECTED to fail)"
+    git fetch "${OLD_REPO}" "refs/gittuf/*:refs/gittuf/*"
+    echo "FETCH EXIT: $? (expected non-zero: cross-algorithm fetch is refused)"
+
+    echo "[CMD] refs/gittuf/* present after fast-import (SHA-256 IDs):"
+    git for-each-ref refs/gittuf/
 
     echo "[CMD] Checking repo object format and head"
     git rev-parse --show-object-format
@@ -194,10 +208,6 @@ EOF
     echo "[CMD] Signing Genesis Bridge payload with OLD root key"
     ssh-keygen -Y sign -f "${KEYS_DIR}/root" -n file genesis-bridge.json
 
-    echo "[CMD] Verifying Genesis Bridge signature"
-    echo "root-key $(cat "${KEYS_DIR}/root.pub")" > allowed_signers
-    ssh-keygen -Y verify -f allowed_signers -I root-key -n file -s genesis-bridge.json.sig < genesis-bridge.json
-
     echo "[CMD] Initializing fresh gittuf trust & policy in new-repo-attest"
     "${GITTUF_BIN}" trust init -k "${KEYS_DIR}/root" --create-rsl-entry
     "${GITTUF_BIN}" trust add-policy-key -k "${KEYS_DIR}/root" --policy-key "${KEYS_DIR}/policy.pub" --create-rsl-entry
@@ -210,15 +220,60 @@ EOF
 
     "${GITTUF_BIN}" rsl record main --local-only
 
-    echo "[CMD] Inspecting Genesis Bridge Linkage in repo"
-    cat genesis-bridge.json
-    echo "Signature: $(head -n 2 genesis-bridge.json.sig)..."
+    # Embed the bridge as a tree entry inside refs/gittuf/attestations
+    # (hash-migration/genesis-bridge.json[.sig]). A separate ref such as
+    # refs/gittuf/attestations/genesis cannot coexist with
+    # refs/gittuf/attestations, and gittuf's attestation loader skips tree
+    # entries it does not know. --no-filters keeps the blobs byte-identical
+    # to what was signed.
+    echo "[CMD] Committing Genesis Bridge into refs/gittuf/attestations"
+    BLOB_P="$(git hash-object -w --no-filters genesis-bridge.json)"
+    BLOB_S="$(git hash-object -w --no-filters genesis-bridge.json.sig)"
+    SUB_TREE="$(printf '100644 blob %s\tgenesis-bridge.json\n100644 blob %s\tgenesis-bridge.json.sig\n' "${BLOB_P}" "${BLOB_S}" | git mktree)"
+    PARENT_ARGS=()
+    if git rev-parse -q --verify refs/gittuf/attestations >/dev/null; then
+        PARENT_ARGS=(-p "$(git rev-parse refs/gittuf/attestations)")
+        EXISTING_ENTRIES="$(git ls-tree refs/gittuf/attestations | grep -v "	hash-migration$" || true)"
+    else
+        EXISTING_ENTRIES=""
+    fi
+    TOP_TREE="$( { [ -n "${EXISTING_ENTRIES}" ] && echo "${EXISTING_ENTRIES}"; printf '040000 tree %s\thash-migration\n' "${SUB_TREE}"; } | git mktree)"
+    ATTEST_COMMIT="$(git commit-tree "${TOP_TREE}" "${PARENT_ARGS[@]}" -m "Add hash-migration genesis bridge (old RSL tip ${OLD_RSL_TIP})")"
+    git update-ref refs/gittuf/attestations "${ATTEST_COMMIT}"
+    echo "refs/gittuf/attestations -> ${ATTEST_COMMIT}"
+    "${GITTUF_BIN}" rsl record refs/gittuf/attestations --local-only
 
-    echo "[CMD] Running gittuf verify-ref --verbose main in work/new-repo-attest"
-    "${GITTUF_BIN}" verify-ref --verbose main
-    EXIT_CODE=$?
-    echo "EXIT: ${EXIT_CODE}"
-    exit ${EXIT_CODE}
+    # From here on, only the copy inside the ref is used.
+    rm -f genesis-bridge.json genesis-bridge.json.sig
+    echo "root-key $(cat "${KEYS_DIR}/root.pub")" > allowed_signers
+    git cat-file blob "${ATTEST_COMMIT}:hash-migration/genesis-bridge.json" > ref-bridge.json
+    git cat-file blob "${ATTEST_COMMIT}:hash-migration/genesis-bridge.json.sig" > ref-bridge.json.sig
+
+    FAILED=0
+    check() {  # check <id> <expected: pass|fail> <cmd...>
+        local id="$1" want="$2"; shift 2
+        echo "[CMD] ${id}: $*"
+        "$@"
+        local rc=$?
+        echo "${id} EXIT: ${rc}"
+        if { [ "${want}" = pass ] && [ ${rc} -eq 0 ]; } || { [ "${want}" = fail ] && [ ${rc} -ne 0 ]; }; then
+            echo "${id}: OK (expected ${want})"
+        else
+            echo "${id}: UNEXPECTED (expected ${want})"; FAILED=1
+        fi
+    }
+
+    check D1 pass git cat-file -p refs/gittuf/attestations:hash-migration/genesis-bridge.json
+    check D2 pass sh -c 'ssh-keygen -Y verify -f allowed_signers -I root-key -n file -s ref-bridge.json.sig < ref-bridge.json'
+    sed 's/"old_rsl_tip": "./"old_rsl_tip": "X/' ref-bridge.json > ref-bridge-tampered.json
+    check D3 fail sh -c 'ssh-keygen -Y verify -f allowed_signers -I root-key -n file -s ref-bridge.json.sig < ref-bridge-tampered.json'
+    check D4 pass sh -c "'${GITTUF_BIN}' rsl log | grep -A2 'Ref:    refs/gittuf/attestations'"
+    check D5 pass "${GITTUF_BIN}" verify-ref --verbose main
+
+    echo "NOTE: D2/D3 are verified with ssh-keygen, not gittuf. gittuf verify-ref"
+    echo "      does not read hash-migration/*; D5 only shows gittuf tolerates it."
+    echo "EXIT: ${FAILED}"
+    exit ${FAILED}
 ) > "${LOG_D}" 2>&1
 EXIT_D=$?
 echo "Scenario D Finished: Exit ${EXIT_D}"
