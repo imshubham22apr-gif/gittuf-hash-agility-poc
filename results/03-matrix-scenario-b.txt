@@ -1,6 +1,6 @@
 === Scenario B: Naive Copy to SHA-256 Repo ===
 [CMD] git init --object-format=sha256 -b main
-Initialized empty Git repository in D:/OneDrive/Desktop/GITTUF/work/new-repo-naive/.git/
+Initialized empty Git repository in C:/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/work/new-repo-naive/.git/
 [CMD] fast-export from old-repo | fast-import into new-repo-naive
 fast-import statistics:
 ---------------------------------------------------------------------
@@ -23,36 +23,41 @@ pack_report: core.packedGitLimit      = 35184372088832
 pack_report: pack_used_ctr            =          3
 pack_report: pack_mmap_calls          =          2
 pack_report: pack_open_windows        =          0 /          1
-pack_report: pack_mapped              =          0 /       8064
+pack_report: pack_mapped              =          0 /       8071
 ---------------------------------------------------------------------
 
-[CMD] Fetching refs/gittuf/* from old-repo (naive copy)
+[CMD] Fetching refs/gittuf/* from old-repo (naive copy, EXPECTED to fail)
 fatal: mismatched algorithms: client sha256; server sha1
+FETCH EXIT: 128 (expected non-zero: cross-algorithm fetch is refused)
+[CMD] refs/gittuf/* present after fast-import (SHA-256 IDs):
+7ab2b6c0cf2d544396e49572e7c7138295cf05beb9626c46c2c47a691746c16c commit	refs/gittuf/policy
+7ab2b6c0cf2d544396e49572e7c7138295cf05beb9626c46c2c47a691746c16c commit	refs/gittuf/policy-staging
+c12360e24e8f3b7aaecdc2e5b473867a097362313754473055c1983228c86a6e commit	refs/gittuf/reference-state-log
 [CMD] Checking repo object format and head
 sha256
-1757f76331894752532184969f97d5541d7d5f4aa83e4b12ca6a0b67ae6b5071
+523a0d39af1763aaf2f60ce6b5c4036308d1f59c45aec6d3480c18c4b269af86
 [CMD] Running gittuf verify-ref --verbose main in work/new-repo-naive
-time=2026-09-23T11:33:48.152+05:30 level=DEBUG msg="Loading Git repository from '.'..."
-time=2026-09-23T11:33:48.153+05:30 level=DEBUG msg="Looking for Git binary in PATH..."
-time=2026-09-23T11:33:48.166+05:30 level=DEBUG msg="Identifying git directory for repository..."
-time=2026-09-23T11:33:48.200+05:30 level=DEBUG msg="Setting git directory for repository to 'D:\\OneDrive\\Desktop\\GITTUF\\work\\new-repo-naive\\.git'..."
-time=2026-09-23T11:33:48.228+05:30 level=DEBUG msg="Identifying absolute reference path..."
-time=2026-09-23T11:33:48.323+05:30 level=DEBUG msg="Verifying gittuf policies for 'refs/heads/main'"
-time=2026-09-23T11:33:48.323+05:30 level=DEBUG msg="Loading persistent cache from disk..."
-time=2026-09-23T11:33:48.352+05:30 level=DEBUG msg="Persistent cache does not exist"
-time=2026-09-23T11:33:48.352+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
-time=2026-09-23T11:33:48.352+05:30 level=DEBUG msg="Identifying first RSL entry for 'refs/heads/main'..."
-time=2026-09-23T11:33:49.407+05:30 level=DEBUG msg="Identifying latest RSL entry for 'refs/heads/main'..."
-time=2026-09-23T11:33:49.431+05:30 level=DEBUG msg="Verifying all entries..."
-time=2026-09-23T11:33:49.431+05:30 level=DEBUG msg="Loading policy applicable at first entry '609a5011b0bb6b1b2a1bb1007deb33bc0973baa4e477d8681f82339986a06bfc'..."
-time=2026-09-23T11:33:49.458+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
-time=2026-09-23T11:33:49.458+05:30 level=DEBUG msg="Found entry '609a5011b0bb6b1b2a1bb1007deb33bc0973baa4e477d8681f82339986a06bfc' matching before condition..."
-time=2026-09-23T11:33:49.458+05:30 level=DEBUG msg="Loading policy at entry '98e100ad2de266aa563c27970aa87086d7bb246df1b08eabc5eeb21de4771bb7'..."
-time=2026-09-23T11:33:49.458+05:30 level=DEBUG msg="Loading persistent cache from disk..."
-time=2026-09-23T11:33:49.483+05:30 level=DEBUG msg="Persistent cache does not exist"
-time=2026-09-23T11:33:49.483+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
-time=2026-09-23T11:33:49.483+05:30 level=DEBUG msg="Finding first policy entry..."
-time=2026-09-23T11:33:49.557+05:30 level=DEBUG msg="Requested policy's entry is the same as first policy entry"
-Error: unable to inspect if object is commit: exit status 128 when executing `git --git-dir D:\OneDrive\Desktop\GITTUF\work\new-repo-naive\.git cat-file -t dc046aabb690d3c16f177ca78f7ec2eca9fd2848`: fatal: Not a valid object name dc046aabb690d3c16f177ca78f7ec2eca9fd2848
+time=2026-09-23T18:41:50.024+05:30 level=DEBUG msg="Loading Git repository from '.'..."
+time=2026-09-23T18:41:50.026+05:30 level=DEBUG msg="Looking for Git binary in PATH..."
+time=2026-09-23T18:41:50.026+05:30 level=DEBUG msg="Identifying git directory for repository..."
+time=2026-09-23T18:41:50.138+05:30 level=DEBUG msg="Setting git directory for repository to 'C:\\Users\\explo\\Desktop\\poc gittuf\\gittuf-hash-agility-poc\\work\\new-repo-naive\\.git'..."
+time=2026-09-23T18:41:50.270+05:30 level=DEBUG msg="Identifying absolute reference path..."
+time=2026-09-23T18:41:50.593+05:30 level=DEBUG msg="Verifying gittuf policies for 'refs/heads/main'"
+time=2026-09-23T18:41:50.593+05:30 level=DEBUG msg="Loading persistent cache from disk..."
+time=2026-09-23T18:41:50.693+05:30 level=DEBUG msg="Persistent cache does not exist"
+time=2026-09-23T18:41:50.693+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
+time=2026-09-23T18:41:50.693+05:30 level=DEBUG msg="Identifying first RSL entry for 'refs/heads/main'..."
+time=2026-09-23T18:41:54.574+05:30 level=DEBUG msg="Identifying latest RSL entry for 'refs/heads/main'..."
+time=2026-09-23T18:41:54.677+05:30 level=DEBUG msg="Verifying all entries..."
+time=2026-09-23T18:41:54.677+05:30 level=DEBUG msg="Loading policy applicable at first entry 'beb4a03e2bb998541307745bdd7c05c06c3aaf868dba0ba7c205e4006e0fd5b9'..."
+time=2026-09-23T18:41:54.779+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
+time=2026-09-23T18:41:54.779+05:30 level=DEBUG msg="Found entry 'beb4a03e2bb998541307745bdd7c05c06c3aaf868dba0ba7c205e4006e0fd5b9' matching before condition..."
+time=2026-09-23T18:41:54.779+05:30 level=DEBUG msg="Loading policy at entry 'a6d0f1b76d743572acaf6c948ea0aeff44289156675b9aa56c4994ebb5858c97'..."
+time=2026-09-23T18:41:54.779+05:30 level=DEBUG msg="Loading persistent cache from disk..."
+time=2026-09-23T18:41:54.887+05:30 level=DEBUG msg="Persistent cache does not exist"
+time=2026-09-23T18:41:54.887+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
+time=2026-09-23T18:41:54.887+05:30 level=DEBUG msg="Finding first policy entry..."
+time=2026-09-23T18:41:55.198+05:30 level=DEBUG msg="Requested policy's entry is the same as first policy entry"
+Error: unable to inspect if object is commit: exit status 128 when executing `git --git-dir C:\Users\explo\Desktop\poc gittuf\gittuf-hash-agility-poc\work\new-repo-naive\.git cat-file -t 6ee002a59681509586feb316fe18f98c38e66d26`: fatal: Not a valid object name 6ee002a59681509586feb316fe18f98c38e66d26
 
 EXIT: 1

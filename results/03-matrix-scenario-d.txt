@@ -1,6 +1,6 @@
 === Scenario D: Fresh Chain + Genesis Bridge ===
 [CMD] git init --object-format=sha256 -b main
-Initialized empty Git repository in D:/OneDrive/Desktop/GITTUF/work/new-repo-attest/.git/
+Initialized empty Git repository in C:/Users/explo/Desktop/poc gittuf/gittuf-hash-agility-poc/work/new-repo-attest/.git/
 [CMD] fast-export from old-repo | fast-import into new-repo-attest
 fast-import statistics:
 ---------------------------------------------------------------------
@@ -23,73 +23,92 @@ pack_report: core.packedGitLimit      = 35184372088832
 pack_report: pack_used_ctr            =          3
 pack_report: pack_mmap_calls          =          2
 pack_report: pack_open_windows        =          0 /          1
-pack_report: pack_mapped              =          0 /       8064
+pack_report: pack_mapped              =          0 /       8071
 ---------------------------------------------------------------------
 
 [CMD] Stripping historical refs/gittuf/* to prepare for fresh bridge init
 Genesis Bridge Data:
-  old_rsl_tip:               1e73ba090dc2cd3a6166866ab81f36ae8965d532
-  commitment_sha256:         147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35
-  old_root_key_fingerprint:  SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
+  old_rsl_tip:               099955f512e3899fbcb04d0a3b36d2b8291aa431
+  commitment_sha256:         04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2
+  old_root_key_fingerprint:  SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
 [CMD] Signing Genesis Bridge payload with OLD root key
 Signing file genesis-bridge.json
 Write signature to genesis-bridge.json.sig
-[CMD] Verifying Genesis Bridge signature
-Good "file" signature for root-key with ED25519 key SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8
 [CMD] Initializing fresh gittuf trust & policy in new-repo-attest
-[CMD] Inspecting Genesis Bridge Linkage in repo
+[CMD] Committing Genesis Bridge into refs/gittuf/attestations
+refs/gittuf/attestations -> 7ef50c84aefa3e1a247f04ca75e6e4c256818b3b92c6d3fcf17ddbb7745f1e92
+[CMD] D1: git cat-file -p refs/gittuf/attestations:hash-migration/genesis-bridge.json
 {
   "type": "https://gittuf.dev/genesis-bridge/v0.1",
-  "old_rsl_tip": "1e73ba090dc2cd3a6166866ab81f36ae8965d532",
-  "commitment_sha256": "147f6be0ed328a377746d65f7da562e7b4f3b9862cbff1eadd46db20df8bad35",
-  "old_root_key_fingerprint": "SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8",
-  "created_at": "2026-09-23T06:04:02Z"
+  "old_rsl_tip": "099955f512e3899fbcb04d0a3b36d2b8291aa431",
+  "commitment_sha256": "04913ecbc2f27be6f8adec7007faf9afb20002524a77de4a34712cb5a711b4f2",
+  "old_root_key_fingerprint": "SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0",
+  "created_at": "2026-09-23T13:12:44Z"
 }
-Signature: -----BEGIN SSH SIGNATURE-----
-U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg70YLpGlZ4IUqTlEy4W6lx2gNxR...
-[CMD] Running gittuf verify-ref --verbose main in work/new-repo-attest
-time=2026-09-23T11:34:12.519+05:30 level=DEBUG msg="Loading Git repository from '.'..."
-time=2026-09-23T11:34:12.520+05:30 level=DEBUG msg="Looking for Git binary in PATH..."
-time=2026-09-23T11:34:12.521+05:30 level=DEBUG msg="Identifying git directory for repository..."
-time=2026-09-23T11:34:12.559+05:30 level=DEBUG msg="Setting git directory for repository to 'D:\\OneDrive\\Desktop\\GITTUF\\work\\new-repo-attest\\.git'..."
-time=2026-09-23T11:34:12.594+05:30 level=DEBUG msg="Identifying absolute reference path..."
-time=2026-09-23T11:34:12.694+05:30 level=DEBUG msg="Verifying gittuf policies for 'refs/heads/main'"
-time=2026-09-23T11:34:12.694+05:30 level=DEBUG msg="Loading persistent cache from disk..."
-time=2026-09-23T11:34:12.728+05:30 level=DEBUG msg="Persistent cache does not exist"
-time=2026-09-23T11:34:12.728+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
-time=2026-09-23T11:34:12.728+05:30 level=DEBUG msg="Identifying first RSL entry for 'refs/heads/main'..."
-time=2026-09-23T11:34:13.569+05:30 level=DEBUG msg="Identifying latest RSL entry for 'refs/heads/main'..."
-time=2026-09-23T11:34:13.591+05:30 level=DEBUG msg="Verifying all entries..."
-time=2026-09-23T11:34:13.591+05:30 level=DEBUG msg="Loading policy applicable at first entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e'..."
-time=2026-09-23T11:34:13.611+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
-time=2026-09-23T11:34:13.611+05:30 level=DEBUG msg="Found entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e' matching before condition..."
-time=2026-09-23T11:34:13.611+05:30 level=DEBUG msg="Loading policy at entry '87e5fca59c94e2c5e21acc4fddccbb8c2d27684594038e93bc841798a2f83e59'..."
-time=2026-09-23T11:34:13.611+05:30 level=DEBUG msg="Loading persistent cache from disk..."
-time=2026-09-23T11:34:13.627+05:30 level=DEBUG msg="Persistent cache does not exist"
-time=2026-09-23T11:34:13.627+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
-time=2026-09-23T11:34:13.627+05:30 level=DEBUG msg="Finding first policy entry..."
-time=2026-09-23T11:34:13.686+05:30 level=DEBUG msg="Requested policy's entry is the same as first policy entry"
-time=2026-09-23T11:34:13.770+05:30 level=DEBUG msg="Loading policy for '' from '4edd87a11796e7d2d8177678c40d44dd4f19805cd80cae2ce8e56d6e3c41c22c'..."
-time=2026-09-23T11:34:13.983+05:30 level=DEBUG msg="Loaded current repository policy!"
-time=2026-09-23T11:34:13.984+05:30 level=DEBUG msg="Proceeding with verification of attestations..."
-time=2026-09-23T11:34:13.984+05:30 level=DEBUG msg="Found SSH key 'SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8'..."
-time=2026-09-23T11:34:13.985+05:30 level=DEBUG msg="Public key 'SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8' belonging to principal 'SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8' successfully used to verify signature of attestation, counting 'SHA256:8DDk3T2VDDG6mSvmF9orijzuKe6t9OENtmMgkPU15t8' towards threshold..."
-time=2026-09-23T11:34:13.985+05:30 level=DEBUG msg="Proceeding with verification of attestations..."
-time=2026-09-23T11:34:13.985+05:30 level=DEBUG msg="Found SSH key 'SHA256:eyi9MXlfCTMNbhAUZSvXSdvt5FYovFjkaabDCQra7Ws'..."
-time=2026-09-23T11:34:13.985+05:30 level=DEBUG msg="Public key 'SHA256:eyi9MXlfCTMNbhAUZSvXSdvt5FYovFjkaabDCQra7Ws' belonging to principal 'SHA256:eyi9MXlfCTMNbhAUZSvXSdvt5FYovFjkaabDCQra7Ws' successfully used to verify signature of attestation, counting 'SHA256:eyi9MXlfCTMNbhAUZSvXSdvt5FYovFjkaabDCQra7Ws' towards threshold..."
-time=2026-09-23T11:34:13.986+05:30 level=DEBUG msg="Trusting root of trust for initial policy '87e5fca59c94e2c5e21acc4fddccbb8c2d27684594038e93bc841798a2f83e59'..."
-time=2026-09-23T11:34:13.986+05:30 level=DEBUG msg="Loading attestations applicable at first entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e'..."
-time=2026-09-23T11:34:14.017+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
-time=2026-09-23T11:34:14.017+05:30 level=DEBUG msg="Found entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e' matching before condition..."
-time=2026-09-23T11:34:14.086+05:30 level=DEBUG msg="No attestations found before initial entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e'"
-time=2026-09-23T11:34:14.086+05:30 level=DEBUG msg="Identifying all entries in range..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Verifying entry 'f99b96eb2ac478915f8abd87f735c69a66ee860df2c258cd0d9e80b753f7c25e'..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Checking if entry is for policy staging reference..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Checking if entry is for policy reference..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Checking if entry is for attestations reference..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Verifying changes..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Searching for applicable reference authorizations and code reviews..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Initializing path cache in policy..."
-time=2026-09-23T11:34:14.117+05:30 level=DEBUG msg="Verifying if tip of reference matches expected value from RSL..."
-time=2026-09-23T11:34:14.146+05:30 level=DEBUG msg="Verification successful!"
+D1 EXIT: 0
+D1: OK (expected pass)
+[CMD] D2: sh -c ssh-keygen -Y verify -f allowed_signers -I root-key -n file -s ref-bridge.json.sig < ref-bridge.json
+Good "file" signature for root-key with ED25519 key SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0
+D2 EXIT: 0
+D2: OK (expected pass)
+[CMD] D3: sh -c ssh-keygen -Y verify -f allowed_signers -I root-key -n file -s ref-bridge.json.sig < ref-bridge-tampered.json
+Signature verification failed: incorrect signature
+Could not verify signature.
+D3 EXIT: 255
+D3: OK (expected fail)
+[CMD] D4: sh -c '/c/Users/explo/go/bin/gittuf' rsl log | grep -A2 'Ref:    refs/gittuf/attestations'
+  Ref:    refs/gittuf/attestations
+  Target: 7ef50c84aefa3e1a247f04ca75e6e4c256818b3b92c6d3fcf17ddbb7745f1e92
+  Number: 8
+D4 EXIT: 0
+D4: OK (expected pass)
+[CMD] D5: /c/Users/explo/go/bin/gittuf verify-ref --verbose main
+time=2026-09-23T18:43:32.861+05:30 level=DEBUG msg="Loading Git repository from '.'..."
+time=2026-09-23T18:43:32.861+05:30 level=DEBUG msg="Looking for Git binary in PATH..."
+time=2026-09-23T18:43:32.862+05:30 level=DEBUG msg="Identifying git directory for repository..."
+time=2026-09-23T18:43:32.971+05:30 level=DEBUG msg="Setting git directory for repository to 'C:\\Users\\explo\\Desktop\\poc gittuf\\gittuf-hash-agility-poc\\work\\new-repo-attest\\.git'..."
+time=2026-09-23T18:43:33.070+05:30 level=DEBUG msg="Identifying absolute reference path..."
+time=2026-09-23T18:43:33.372+05:30 level=DEBUG msg="Verifying gittuf policies for 'refs/heads/main'"
+time=2026-09-23T18:43:33.372+05:30 level=DEBUG msg="Loading persistent cache from disk..."
+time=2026-09-23T18:43:33.472+05:30 level=DEBUG msg="Persistent cache does not exist"
+time=2026-09-23T18:43:33.472+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
+time=2026-09-23T18:43:33.472+05:30 level=DEBUG msg="Identifying first RSL entry for 'refs/heads/main'..."
+time=2026-09-23T18:43:36.709+05:30 level=DEBUG msg="Identifying latest RSL entry for 'refs/heads/main'..."
+time=2026-09-23T18:43:36.805+05:30 level=DEBUG msg="Verifying all entries..."
+time=2026-09-23T18:43:36.805+05:30 level=DEBUG msg="Loading policy applicable at first entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85'..."
+time=2026-09-23T18:43:36.907+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
+time=2026-09-23T18:43:36.907+05:30 level=DEBUG msg="Found entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85' matching before condition..."
+time=2026-09-23T18:43:36.907+05:30 level=DEBUG msg="Loading policy at entry '05ef2cb22020a853770506264c9b3c9261a5fbbbc7b9fa2f06019d0accfaa1b5'..."
+time=2026-09-23T18:43:36.907+05:30 level=DEBUG msg="Loading persistent cache from disk..."
+time=2026-09-23T18:43:37.002+05:30 level=DEBUG msg="Persistent cache does not exist"
+time=2026-09-23T18:43:37.002+05:30 level=DEBUG msg="Persistent cache not found, using regular RSL searcher..."
+time=2026-09-23T18:43:37.002+05:30 level=DEBUG msg="Finding first policy entry..."
+time=2026-09-23T18:43:37.311+05:30 level=DEBUG msg="Requested policy's entry is the same as first policy entry"
+time=2026-09-23T18:43:37.615+05:30 level=DEBUG msg="Loading policy for '' from '6fc2c057dc6354e0f254933ebd306c4c6087121261d8dcd8e8a84233fb4a9d1d'..."
+time=2026-09-23T18:43:38.107+05:30 level=DEBUG msg="Loaded current repository policy!"
+time=2026-09-23T18:43:38.108+05:30 level=DEBUG msg="Proceeding with verification of attestations..."
+time=2026-09-23T18:43:38.108+05:30 level=DEBUG msg="Found SSH key 'SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0'..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Public key 'SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0' belonging to principal 'SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0' successfully used to verify signature of attestation, counting 'SHA256:3IKLsLQeQ3fM+zR3++q7ZX7mCuUt6vttO1jm0/LUUF0' towards threshold..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Proceeding with verification of attestations..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Found SSH key 'SHA256:oX2lzrpZxvMS2scGhyn1hZ2sErDSA++m8iOJm1faTRs'..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Public key 'SHA256:oX2lzrpZxvMS2scGhyn1hZ2sErDSA++m8iOJm1faTRs' belonging to principal 'SHA256:oX2lzrpZxvMS2scGhyn1hZ2sErDSA++m8iOJm1faTRs' successfully used to verify signature of attestation, counting 'SHA256:oX2lzrpZxvMS2scGhyn1hZ2sErDSA++m8iOJm1faTRs' towards threshold..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Trusting root of trust for initial policy '05ef2cb22020a853770506264c9b3c9261a5fbbbc7b9fa2f06019d0accfaa1b5'..."
+time=2026-09-23T18:43:38.109+05:30 level=DEBUG msg="Loading attestations applicable at first entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85'..."
+time=2026-09-23T18:43:38.203+05:30 level=DEBUG msg="Scanning RSL for search start point using before condition..."
+time=2026-09-23T18:43:38.203+05:30 level=DEBUG msg="Found entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85' matching before condition..."
+time=2026-09-23T18:43:38.406+05:30 level=DEBUG msg="No attestations found before initial entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85'"
+time=2026-09-23T18:43:38.406+05:30 level=DEBUG msg="Identifying all entries in range..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Verifying entry '54c54f7628d2e7f309f1c3b2837eeb60292d047c69d7e7749c5bc8b1c8828e85'..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Checking if entry is for policy staging reference..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Checking if entry is for policy reference..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Checking if entry is for attestations reference..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Verifying changes..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Searching for applicable reference authorizations and code reviews..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Initializing path cache in policy..."
+time=2026-09-23T18:43:38.503+05:30 level=DEBUG msg="Verifying if tip of reference matches expected value from RSL..."
+time=2026-09-23T18:43:38.597+05:30 level=DEBUG msg="Verification successful!"
+D5 EXIT: 0
+D5: OK (expected pass)
+NOTE: D2/D3 are verified with ssh-keygen, not gittuf. gittuf verify-ref
+      does not read hash-migration/*; D5 only shows gittuf tolerates it.
 EXIT: 0

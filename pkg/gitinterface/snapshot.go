@@ -16,7 +16,6 @@
 //
 // The resulting ContentSHA256 is a single deterministic hash that detects
 // any object-level tampering, even if SHA-1 collisions are exploited.
-
 package gitinterface
 
 import (
@@ -226,7 +225,7 @@ func WriteSnapshotManifest(manifest *SnapshotManifest, outputPath string) error 
 	if err != nil {
 		return fmt.Errorf("cannot marshal snapshot manifest: %w", err)
 	}
-	return os.WriteFile(outputPath, data, 0o644)
+	return os.WriteFile(outputPath, data, 0o644) //nolint:gosec // published record, intended to be world-readable
 }
 
 // LoadSnapshotManifest reads and deserialises a snapshot manifest from disk.
