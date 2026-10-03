@@ -75,6 +75,8 @@ func TestNewGenesisBridgeInvalidFields(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := NewGenesisBridge(test.sha1RSL, test.sha1Head, test.sha256RSL, test.sha256Head)
 			assert.ErrorIs(t, err, test.expectedErr)
 		})
@@ -104,6 +106,8 @@ func TestVerifyGenesisBridgeTampered(t *testing.T) {
 
 	for field, apply := range tamper {
 		t.Run(field, func(t *testing.T) {
+			t.Parallel()
+
 			bridge := newTestBridge(t)
 			apply(bridge)
 
@@ -128,6 +132,8 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid signature round-trips through JSON", func(t *testing.T) {
+		t.Parallel()
+
 		bridge := newTestBridge(t)
 		require.Nil(t, SignGenesisBridge(bridge, newTestSSHKey(t)))
 
@@ -143,12 +149,16 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 	})
 
 	t.Run("unsigned bridge", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := VerifyGenesisBridgeSignature(newTestBridge(t))
 		assert.ErrorIs(t, err, ErrBridgeNotSigned)
 		assert.True(t, result.SignatureSkipped)
 	})
 
 	t.Run("field tampered after signing", func(t *testing.T) {
+		t.Parallel()
+
 		bridge := newTestBridge(t)
 		require.Nil(t, SignGenesisBridge(bridge, newTestSSHKey(t)))
 		bridge.SHA256RSLTip = strings.Repeat("0", 64)
@@ -158,6 +168,8 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 	})
 
 	t.Run("signer key swapped for another key", func(t *testing.T) {
+		t.Parallel()
+
 		bridge := newTestBridge(t)
 		require.Nil(t, SignGenesisBridge(bridge, newTestSSHKey(t)))
 
@@ -170,6 +182,8 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 	})
 
 	t.Run("signature from a different bridge", func(t *testing.T) {
+		t.Parallel()
+
 		key := newTestSSHKey(t)
 		bridge := newTestBridge(t)
 		require.Nil(t, SignGenesisBridge(bridge, key))

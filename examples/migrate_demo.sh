@@ -165,9 +165,10 @@ echo -e "${BOLD}▶ [5/6] Constructing Genesis Bridge across cryptographic epoch
     --sha1-head "${SHA1_HEAD}" \
     --sha256-rsl "${SHA256_RSL_TIP}" \
     --sha256-head "${SHA256_HEAD}" \
+    --signing-key "../keys/root" \
     --output "../genesis-bridge.json" >/dev/null 2>&1
-echo -e "${GREEN}✔ Genesis Bridge Created:${RESET} ${BRIDGE_FILE}"
-grep -E '(sha1_rsl_tip|sha256_rsl_tip|commitment_digest)' "../genesis-bridge.json" | sed 's/^/   /'
+echo -e "${GREEN}✔ Genesis Bridge Created (signed by root key):${RESET} ${BRIDGE_FILE}"
+grep -E '(schema_version|sha1_rsl_tip|sha256_rsl_tip|commitment_digest)' "../genesis-bridge.json" | sed 's/^/   /'
 echo
 
 # ------------------------------------------------------------------------------
@@ -177,6 +178,11 @@ echo -e "${BOLD}▶ [6/6] Verifying Snapshot & Genesis Bridge integrity...${RESE
 cd "${SRC_REPO}"
 "${GITTUF_BIN}" snapshot verify -m "../snapshot-manifest.json"
 "${GITTUF_BIN}" bridge verify -f "../genesis-bridge.json"
+
+# Establish trust: the bridge signer must be a root key of the SHA-256 repo,
+# and the bridge must bind both epochs' RSL tips and HEADs.
+cd "${DST_REPO}"
+"${GITTUF_BIN}" verify-ref main --bridge-file "../genesis-bridge.json" --sha1-repo "${SRC_REPO}"
 
 echo
 echo -e "${BOLD}${GREEN}======================================================================${RESET}"
