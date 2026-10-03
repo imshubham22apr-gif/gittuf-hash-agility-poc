@@ -211,14 +211,20 @@ func (r *Repository) VerifyNetwork(ctx context.Context) error {
 // the GAP-1 cross-epoch verify-ref walk.
 //
 // Security model (Option B — Bridge File as Cryptographic Anchor):
-//  1. Load the Genesis Bridge JSON (bridgeFilePath) and verify its internal
-//     commitment digest.
-//  2. Load the SHA-1 repository (sha1RepoPath) and read its actual RSL tip.
-//  3. Compare the actual SHA-1 RSL tip against bridge.SHA1RSLTip — if they
-//     don't match, reject immediately. This prevents a wrong/malicious SHA-1
-//     repo from being substituted.
-//  4. Verify the current SHA-256 epoch using the standard VerifyRef flow.
-//  5. Verify the SHA-1 epoch's full RSL using the same policy engine.
+//  1. Load the Genesis Bridge JSON (bridgeFilePath) and verify its commitment
+//     digest and SSH signature.
+//  2. Require the signer to be a root key of this (SHA-256) repository's
+//     current policy. The key embedded in the bridge is never trusted on its
+//     own; the root of trust the verifier already relies on vouches for the
+//     bridge.
+//  3. Load the SHA-1 repository (sha1RepoPath) and require its actual RSL tip
+//     to equal bridge.SHA1RSLTip, so a different SHA-1 repo cannot be
+//     substituted.
+//  4. Verify the current SHA-256 epoch using the standard VerifyRef flow, then
+//     require the bridge's SHA-256 RSL tip and HEAD to be reachable from this
+//     repository's RSL and the verified ref.
+//  5. Verify the SHA-1 epoch's full RSL using the same policy engine and
+//     require its verified tip to equal bridge.SHA1HeadOID.
 func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFilePath, sha1RepoPath string, opts ...verifyopts.Option) error {
 	// ── Phase 1: Load and verify the Genesis Bridge JSON ──────────────────────
 	slog.Info("GAP-1 cross-epoch verify: loading Genesis Bridge record...")
@@ -244,6 +250,16 @@ func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFil
 		"GAP-1 bridge commitment ✔  signature ✔  sha1_rsl_tip=%s  sha256_rsl_tip=%s  signer=%s",
 		sigResult.SHA1RSLTip, sigResult.SHA256RSLTip, bridge.SignerPublicKey[:min(40, len(bridge.SignerPublicKey))]+"...",
 	))
+
+	slog.Info("GAP-1 cross-epoch verify: checking bridge signer against SHA-256 epoch root keys...")
+	sha256PolicyState, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+	if err != nil {
+		return fmt.Errorf("cannot load SHA-256 epoch policy: %w", err)
+	}
+	if err := verifyBridgeSignerIsRoot(sha256PolicyState, bridge.SignerPublicKey); err != nil {
+		return fmt.Errorf("GAP-1 security check FAILED: %w", err)
+	}
+	slog.Info("GAP-1 bridge signer is a SHA-256 epoch root key ✔")
 
 	// ── Phase 2: Load SHA-1 repo and anchor-check its RSL tip ─────────────────
 	slog.Info(fmt.Sprintf("GAP-1 cross-epoch verify: loading SHA-1 repository from '%s'...", sha1RepoPath))
@@ -276,6 +292,18 @@ func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFil
 		return fmt.Errorf("SHA-256 epoch verification failed: %w", err)
 	}
 	slog.Info("GAP-1 SHA-256 epoch verification ✔")
+
+	absRefName, err := r.r.AbsoluteReference(refName)
+	if err != nil {
+		return fmt.Errorf("cannot resolve ref '%s': %w", refName, err)
+	}
+	if err := r.verifyBridgeBindsRepository(bridge, absRefName); err != nil {
+		return fmt.Errorf("GAP-1 security check FAILED: %w", err)
+	}
+	slog.Info(fmt.Sprintf(
+		"GAP-1 SHA-256 anchor check ✔  sha256_rsl_tip=%s  sha256_head=%s",
+		bridge.SHA256RSLTip, bridge.SHA256HeadOID,
+	))
 
 	// ── Phase 4: Verify SHA-1 epoch RSL ──────────────────────────────────────
 	slog.Info("GAP-1 cross-epoch verify: verifying SHA-1 epoch RSL...")

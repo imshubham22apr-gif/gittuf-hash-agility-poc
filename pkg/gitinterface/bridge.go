@@ -10,7 +10,10 @@
 //
 // Commitment formula:
 //
-//	sha256("genesis-bridge|sha1|<sha1RSLTip>|<sha1HeadOID>|<sha256HeadOID>|<RFC3339timestamp>")
+//	sha256("genesis-bridge|gap1-bridge-v2|sha1|<sha1RSLTip>|<sha1HeadOID>|sha256|<sha256RSLTip>|<sha256HeadOID>|<RFC3339timestamp>")
+//
+// All four OIDs are committed so that no field can be changed without
+// invalidating the digest (and therefore the signature).
 //
 // The CommitmentDigest is signed using an SSH private key (sshsig format,
 // namespace "gittuf-bridge"). The resulting armored signature and the signer's
@@ -22,6 +25,7 @@ package gitinterface
 
 import (
 	"bytes"
+	"crypto/sha1" //nolint:gosec // used only for the SHA-1 digest size
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -40,6 +44,10 @@ const (
 	// the Genesis Bridge commitment digest. Using a distinct namespace prevents
 	// signatures created for git commits from being accepted here and vice-versa.
 	bridgeSigNamespace = "gittuf-bridge"
+
+	// BridgeSchemaVersion is the only bridge schema accepted by verification.
+	// v1 bridges did not commit to the SHA-256 RSL tip and are rejected.
+	BridgeSchemaVersion = "gap1-bridge-v2"
 )
 
 var (
@@ -56,13 +64,17 @@ var (
 	// ErrBridgeSignatureInvalid is returned when the SSH signature over the
 	// commitment digest fails verification.
 	ErrBridgeSignatureInvalid = errors.New("bridge SSH signature verification failed")
+
+	// ErrBridgeUnsupportedSchema is returned when a bridge record uses a
+	// schema version other than BridgeSchemaVersion.
+	ErrBridgeUnsupportedSchema = errors.New("unsupported bridge schema version")
 )
 
 // GenesisBridgeRecord is the canonical link between a SHA-1 epoch's final
 // RSL tip and the SHA-256 epoch's first RSL tip.
 //
 // JSON fields:
-//   - schema_version    — "gap1-bridge-v1"
+//   - schema_version    — "gap1-bridge-v2"
 //   - created_at        — RFC3339 UTC timestamp of migration freeze
 //   - sha1_rsl_tip      — final RSL tip in the SHA-1 epoch
 //   - sha1_head_oid     — HEAD commit OID in the SHA-1 epoch
@@ -73,33 +85,33 @@ var (
 //   - signer_public_key — raw SSH public key used for signing (optional)
 //   - description       — human-readable note
 type GenesisBridgeRecord struct {
-	SchemaVersion   string    `json:"schema_version"`
-	CreatedAt       time.Time `json:"created_at"`
-	SHA1RSLTip      string    `json:"sha1_rsl_tip"`
-	SHA1HeadOID     string    `json:"sha1_head_oid"`
-	SHA256RSLTip    string    `json:"sha256_rsl_tip"`
-	SHA256HeadOID   string    `json:"sha256_head_oid"`
-	CommitmentDigest string   `json:"commitment_digest"`
+	SchemaVersion    string    `json:"schema_version"`
+	CreatedAt        time.Time `json:"created_at"`
+	SHA1RSLTip       string    `json:"sha1_rsl_tip"`
+	SHA1HeadOID      string    `json:"sha1_head_oid"`
+	SHA256RSLTip     string    `json:"sha256_rsl_tip"`
+	SHA256HeadOID    string    `json:"sha256_head_oid"`
+	CommitmentDigest string    `json:"commitment_digest"`
 	// Signature is the armored sshsig signature over CommitmentDigest bytes,
 	// created with the private key corresponding to SignerPublicKey.
 	// Empty when the bridge has not been signed yet.
-	Signature       string    `json:"signature,omitempty"`
+	Signature string `json:"signature,omitempty"`
 	// SignerPublicKey is the raw SSH public-key line (e.g. "ssh-ed25519 AAAA...")
 	// of the key that produced Signature. Embedded so verifiers need only
 	// the bridge JSON — no external allowed_signers file required.
-	SignerPublicKey  string    `json:"signer_public_key,omitempty"`
-	Description     string    `json:"description"`
+	SignerPublicKey string `json:"signer_public_key,omitempty"`
+	Description     string `json:"description"`
 }
 
 // BridgeVerificationResult holds the output of VerifyGenesisBridge and
 // VerifyGenesisBridgeSignature.
 type BridgeVerificationResult struct {
-	SHA1RSLTip      string
-	SHA256RSLTip    string
-	CommitmentOK    bool
-	SignatureOK     bool
+	SHA1RSLTip       string
+	SHA256RSLTip     string
+	CommitmentOK     bool
+	SignatureOK      bool
 	SignatureSkipped bool // true when bridge carries no signature
-	ErrorDetail     string
+	ErrorDetail      string
 }
 
 // NewGenesisBridge creates an unsigned GenesisBridgeRecord.
@@ -108,29 +120,70 @@ func NewGenesisBridge(
 	sha1RSLTip, sha1HeadOID,
 	sha256RSLTip, sha256HeadOID string,
 ) (*GenesisBridgeRecord, error) {
-	if sha1RSLTip == "" || sha256RSLTip == "" {
-		return nil, ErrBridgeMissingField
+	bridge := &GenesisBridgeRecord{
+		SchemaVersion: BridgeSchemaVersion,
+		// Truncate to seconds so the in-memory value matches what the
+		// RFC3339 commitment and the JSON round-trip preserve.
+		CreatedAt:     time.Now().UTC().Truncate(time.Second),
+		SHA1RSLTip:    sha1RSLTip,
+		SHA1HeadOID:   sha1HeadOID,
+		SHA256RSLTip:  sha256RSLTip,
+		SHA256HeadOID: sha256HeadOID,
+		Description:   "GAP-1 Genesis Bridge: links SHA-1 RSL epoch to SHA-256 RSL epoch for continuous chain of trust",
 	}
-	if sha1HeadOID == "" || sha256HeadOID == "" {
-		return nil, ErrBridgeMissingField
+	if err := validateBridgeFields(bridge); err != nil {
+		return nil, err
 	}
+	bridge.CommitmentDigest = computeBridgeCommitment(bridge)
 
-	now := time.Now().UTC()
-	raw := fmt.Sprintf("genesis-bridge|sha1|%s|%s|%s|%s",
-		sha1RSLTip, sha1HeadOID, sha256HeadOID, now.Format(time.RFC3339))
+	return bridge, nil
+}
+
+// computeBridgeCommitment returns the canonical commitment digest over every
+// identifying field of the bridge.
+func computeBridgeCommitment(bridge *GenesisBridgeRecord) string {
+	raw := fmt.Sprintf("genesis-bridge|%s|sha1|%s|%s|sha256|%s|%s|%s",
+		bridge.SchemaVersion,
+		bridge.SHA1RSLTip,
+		bridge.SHA1HeadOID,
+		bridge.SHA256RSLTip,
+		bridge.SHA256HeadOID,
+		bridge.CreatedAt.UTC().Format(time.RFC3339),
+	)
 	h := sha256.Sum256([]byte(raw))
-	commitment := hex.EncodeToString(h[:])
+	return hex.EncodeToString(h[:])
+}
 
-	return &GenesisBridgeRecord{
-		SchemaVersion:    "gap1-bridge-v1",
-		CreatedAt:        now,
-		SHA1RSLTip:       sha1RSLTip,
-		SHA1HeadOID:      sha1HeadOID,
-		SHA256RSLTip:     sha256RSLTip,
-		SHA256HeadOID:    sha256HeadOID,
-		CommitmentDigest: commitment,
-		Description:      "GAP-1 Genesis Bridge: links SHA-1 RSL epoch to SHA-256 RSL epoch for continuous chain of trust",
-	}, nil
+// validateBridgeFields checks the schema version and that every OID is
+// present, hex-encoded, and of the length expected for its epoch (40 hex
+// chars for SHA-1, 64 for SHA-256).
+func validateBridgeFields(bridge *GenesisBridgeRecord) error {
+	if bridge.SchemaVersion != BridgeSchemaVersion {
+		return fmt.Errorf("%w: got '%s', want '%s'", ErrBridgeUnsupportedSchema, bridge.SchemaVersion, BridgeSchemaVersion)
+	}
+
+	oids := []struct {
+		name, value string
+		hexLen      int
+	}{
+		{"sha1_rsl_tip", bridge.SHA1RSLTip, sha1.Size * 2},
+		{"sha1_head_oid", bridge.SHA1HeadOID, sha1.Size * 2},
+		{"sha256_rsl_tip", bridge.SHA256RSLTip, sha256.Size * 2},
+		{"sha256_head_oid", bridge.SHA256HeadOID, sha256.Size * 2},
+	}
+	for _, oid := range oids {
+		if oid.value == "" {
+			return fmt.Errorf("%w: %s", ErrBridgeMissingField, oid.name)
+		}
+		if len(oid.value) != oid.hexLen {
+			return fmt.Errorf("%w: %s must be %d hex chars, got %d", ErrBridgeInvalidHash, oid.name, oid.hexLen, len(oid.value))
+		}
+		if _, err := hex.DecodeString(oid.value); err != nil {
+			return fmt.Errorf("%w: %s is not valid hex", ErrBridgeInvalidHash, oid.name)
+		}
+	}
+
+	return nil
 }
 
 // SignGenesisBridge signs the bridge's CommitmentDigest using the provided
@@ -177,15 +230,12 @@ func VerifyGenesisBridge(bridge *GenesisBridgeRecord) *BridgeVerificationResult 
 		SHA256RSLTip: bridge.SHA256RSLTip,
 	}
 
-	raw := fmt.Sprintf("genesis-bridge|sha1|%s|%s|%s|%s",
-		bridge.SHA1RSLTip,
-		bridge.SHA1HeadOID,
-		bridge.SHA256HeadOID,
-		bridge.CreatedAt.Format(time.RFC3339),
-	)
-	h := sha256.Sum256([]byte(raw))
-	expected := hex.EncodeToString(h[:])
+	if err := validateBridgeFields(bridge); err != nil {
+		result.ErrorDetail = err.Error()
+		return result
+	}
 
+	expected := computeBridgeCommitment(bridge)
 	if expected == bridge.CommitmentDigest {
 		result.CommitmentOK = true
 	} else {

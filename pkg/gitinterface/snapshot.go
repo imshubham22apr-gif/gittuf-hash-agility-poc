@@ -81,15 +81,24 @@ type SnapshotManifest struct {
 // computes SHA-256 over each object's canonical representation (<type> <size>\0<content>),
 // deduplicates and sorts the content digests lexicographically, and hashes the result.
 //
-// This ensures that even if a SHA-1 collision attack produces identical 40-char
-// object names, the differing raw content payloads will yield distinct SHA-256
-// digests, reliably detecting and rejecting any collision tampering.
+// Because the digest covers object content rather than object names, an object
+// whose content is substituted after the freeze is detected even if the
+// substitute has a colliding SHA-1 name. It cannot detect a collision that was
+// already present when the freeze was taken.
 func (r *Repository) ComputeContentSHA256() (string, error) {
 	stdOut, _, err := r.executor("cat-file", "--batch-all-objects", "--batch").execute()
 	if err != nil {
 		return "", fmt.Errorf("git cat-file failed: %w", err)
 	}
 
+	return hashObjectStream(stdOut)
+}
+
+// hashObjectStream consumes `git cat-file --batch` output and returns the
+// master digest described on ComputeContentSHA256. It is split out so the
+// collision property (same OID, different content => different digest) can be
+// tested without constructing a real SHA-1 collision.
+func hashObjectStream(stdOut io.Reader) (string, error) {
 	reader := bufio.NewReader(stdOut)
 	var objectDigests []string
 

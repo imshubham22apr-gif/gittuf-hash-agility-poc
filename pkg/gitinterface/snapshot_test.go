@@ -4,7 +4,12 @@
 package gitinterface
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestComputeContentSHA256 verifies that ComputeContentSHA256 returns a
@@ -120,4 +125,29 @@ func TestTakeSnapshot(t *testing.T) {
 	if manifest.FrozenAt.IsZero() {
 		t.Error("manifest.FrozenAt is zero")
 	}
+}
+
+// TestHashObjectStreamDetectsCollision simulates a SHA-1 collision: two object
+// stores report the same object name but carry different content. The content
+// digest must differ, which an OID-only digest could not achieve.
+func TestHashObjectStreamDetectsCollision(t *testing.T) {
+	t.Parallel()
+
+	const collidingOID = "38762cf7f55934b34d179ae6a4c80cadccbb7f0a"
+	stream := func(content string) string {
+		return fmt.Sprintf("%s blob %d\n%s\n", collidingOID, len(content), content)
+	}
+
+	original, err := hashObjectStream(strings.NewReader(stream("benign content")))
+	require.Nil(t, err)
+	substituted, err := hashObjectStream(strings.NewReader(stream("backdoored content")))
+	require.Nil(t, err)
+	assert.NotEqual(t, original, substituted)
+
+	again, err := hashObjectStream(strings.NewReader(stream("benign content")))
+	require.Nil(t, err)
+	assert.Equal(t, original, again)
+
+	_, err = hashObjectStream(strings.NewReader(""))
+	assert.ErrorIs(t, err, ErrSnapshotNoObjects)
 }

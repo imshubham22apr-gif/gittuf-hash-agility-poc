@@ -506,3 +506,21 @@ func TestAbsoluteReference(t *testing.T) {
 		assert.ErrorIs(t, err, ErrReferenceNotFound)
 	})
 }
+
+func TestReferenceUpdatesRefusedInCompatMode(t *testing.T) {
+	t.Setenv(CompatModeKey, "1")
+
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false, WithSHA256Format())
+	require.Nil(t, repo.SetGitConfig("extensions.compatObjectFormat", "sha1"))
+	require.Nil(t, repo.ensureNoCompatObjectFormat())
+	require.True(t, repo.IsCompatMode())
+
+	refName := "refs/gittuf/reference-state-log"
+	gitID := repo.ZeroHash()
+
+	assert.ErrorIs(t, repo.SetReference(refName, gitID), ErrCompatModeReadOnly)
+	assert.ErrorIs(t, repo.CheckAndSetReference(refName, gitID, gitID), ErrCompatModeReadOnly)
+	assert.ErrorIs(t, repo.DeleteReference(refName), ErrCompatModeReadOnly)
+	assert.ErrorIs(t, repo.SetSymbolicReference("HEAD", "refs/heads/main"), ErrCompatModeReadOnly)
+}

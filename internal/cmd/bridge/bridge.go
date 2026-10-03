@@ -112,9 +112,12 @@ func (vo *verifyOptions) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	cmd.Printf("✅ Commitment digest ✔\n")
-	cmd.Printf("✅ SSH signature     ✔\n")
+	cmd.Printf("✅ SSH signature valid for the key embedded in the bridge\n")
 	cmd.Printf("   Signer key: %s\n", bridge.SignerPublicKey)
-	cmd.Printf("   Commitment: %s\n", bridge.CommitmentDigest)
+	cmd.Printf("   Commitment: %s\n\n", bridge.CommitmentDigest)
+	cmd.Printf("⚠️  This does NOT establish trust: anyone can embed their own key.\n")
+	cmd.Printf("   Run 'gittuf verify-ref <ref> --bridge-file <bridge.json> --sha1-repo <path>'\n")
+	cmd.Printf("   to require the signer to be a root key of the SHA-256 repository.\n")
 	return nil
 }
 
@@ -141,7 +144,7 @@ func New() *cobra.Command {
 	verifyOpt := &verifyOptions{}
 	verifyCmd := &cobra.Command{
 		Use:               "verify",
-		Short:             "Verify commitment digest AND SSH signature of a Genesis Bridge record",
+		Short:             "Check a Genesis Bridge record's commitment digest and embedded-key signature (does not establish trust)",
 		RunE:              verifyOpt.Run,
 		DisableAutoGenTag: true,
 	}

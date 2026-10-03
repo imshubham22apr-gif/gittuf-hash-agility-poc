@@ -20,7 +20,24 @@ const (
 	RemoteRefPrefix = "refs/remotes/"
 )
 
-var ErrReferenceNotFound = gitstore.ErrReferenceNotFound
+var (
+	ErrReferenceNotFound = gitstore.ErrReferenceNotFound
+
+	// ErrCompatModeReadOnly is returned when a reference update is attempted
+	// on a repository loaded in compatibility mode (GITTUF_COMPAT_MODE). Every
+	// gittuf state change (RSL, policy, attestations) is a reference update,
+	// so refusing them keeps compatibility mode strictly read-only.
+	ErrCompatModeReadOnly = errors.New("repository is loaded in compatibility mode, which is read-only: reference updates are not allowed")
+)
+
+// ensureWritable returns ErrCompatModeReadOnly if the repository is loaded in
+// compatibility mode.
+func (r *Repository) ensureWritable(refName string) error {
+	if r.IsCompatMode() {
+		return fmt.Errorf("%w: refusing to update '%s'", ErrCompatModeReadOnly, refName)
+	}
+	return nil
+}
 
 // GetReference returns the tip of the specified Git reference.
 func (r *Repository) GetReference(refName string) (Hash, error) {
@@ -42,6 +59,10 @@ func (r *Repository) GetReference(refName string) (Hash, error) {
 
 // SetReference sets the specified reference to the provided Git ID.
 func (r *Repository) SetReference(refName string, gitID Hash) error {
+	if err := r.ensureWritable(refName); err != nil {
+		return err
+	}
+
 	_, err := r.executor("update-ref", "--create-reflog", refName, gitID.String()).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to set Git reference '%s' to '%s': %w", refName, gitID.String(), err)
@@ -52,6 +73,10 @@ func (r *Repository) SetReference(refName string, gitID Hash) error {
 
 // DeleteReference deletes the specified Git reference.
 func (r *Repository) DeleteReference(refName string) error {
+	if err := r.ensureWritable(refName); err != nil {
+		return err
+	}
+
 	_, err := r.executor("update-ref", "-d", refName).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to delete Git reference '%s': %w", refName, err)
@@ -62,6 +87,10 @@ func (r *Repository) DeleteReference(refName string) error {
 // CheckAndSetReference sets the specified reference to the provided Git ID if
 // the reference is currently set to `oldGitID`.
 func (r *Repository) CheckAndSetReference(refName string, newGitID, oldGitID Hash) error {
+	if err := r.ensureWritable(refName); err != nil {
+		return err
+	}
+
 	_, err := r.executor("update-ref", "--create-reflog", refName, newGitID.String(), oldGitID.String()).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to set Git reference '%s' to '%s': %w", refName, newGitID.String(), err)
@@ -84,6 +113,10 @@ func (r *Repository) GetSymbolicReferenceTarget(refName string) (string, error) 
 // SetSymbolicReference sets the specified symbolic reference to the specified
 // target reference.
 func (r *Repository) SetSymbolicReference(symRefName, targetRefName string) error {
+	if err := r.ensureWritable(symRefName); err != nil {
+		return err
+	}
+
 	_, err := r.executor("symbolic-ref", symRefName, targetRefName).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to set symbolic Git reference '%s' to '%s': %w", symRefName, targetRefName, err)
