@@ -20,12 +20,16 @@ func TestBridgeCommands(t *testing.T) {
 
 	foundCreate := false
 	foundVerify := false
+	foundRecord := false
 	for _, sc := range subCommands {
 		if sc.Name() == "create" {
 			foundCreate = true
 		}
 		if sc.Name() == "verify" {
 			foundVerify = true
+		}
+		if sc.Name() == "record" {
+			foundRecord = true
 		}
 	}
 
@@ -34,5 +38,8 @@ func TestBridgeCommands(t *testing.T) {
 	}
 	if !foundVerify {
 		t.Error("expected 'verify' subcommand not found")
+	}
+	if !foundRecord {
+		t.Error("expected 'record' subcommand not found")
 	}
 }
