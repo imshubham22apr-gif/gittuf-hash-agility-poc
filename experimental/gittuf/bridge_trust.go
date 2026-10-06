@@ -43,6 +43,10 @@ func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch root threshold: %w", err)
 	}
+	// Root threshold enforcement: Genesis Bridge records currently embed a single
+	// signature. If the SHA-256 epoch's TUF root threshold is greater than 1,
+	// verification must fail closed with ErrBridgeThresholdUnsupported until
+	// multi-signature bridge structures are introduced.
 	if threshold > 1 {
 		return fmt.Errorf("%w (threshold %d)", ErrBridgeThresholdUnsupported, threshold)
 	}
