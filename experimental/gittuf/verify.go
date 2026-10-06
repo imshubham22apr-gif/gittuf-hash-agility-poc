@@ -210,9 +210,13 @@ func (r *Repository) VerifyNetwork(ctx context.Context) error {
 // across both the current (SHA-256) and prior (SHA-1) epochs. This implements
 // the GAP-1 cross-epoch verify-ref walk.
 //
-// Security model (Option B — Bridge File as Cryptographic Anchor):
-//  1. Load the Genesis Bridge JSON (bridgeFilePath) and verify its commitment
-//     digest and SSH signature.
+// The bridge comes from the RSL's GenesisBridgeEntry (recorded with
+// RecordGenesisBridge) when bridgeFilePath is empty, or from a bridge JSON file.
+// If both exist they must describe the same bridge.
+//
+// Security model:
+//  1. Load the Genesis Bridge and verify its commitment digest and SSH
+//     signature.
 //  2. Require the signer to be a root key of this (SHA-256) repository's
 //     current policy. The key embedded in the bridge is never trusted on its
 //     own; the root of trust the verifier already relies on vouches for the
@@ -223,15 +227,22 @@ func (r *Repository) VerifyNetwork(ctx context.Context) error {
 //  4. Verify the current SHA-256 epoch using the standard VerifyRef flow, then
 //     require the bridge's SHA-256 RSL tip and HEAD to be reachable from this
 //     repository's RSL and the verified ref.
-//  5. Verify the SHA-1 epoch's full RSL using the same policy engine and
+//  5. If the bridge is in the RSL, require its entry to sit directly on top of
+//     the RSL tip it commits to.
+//  6. Verify the SHA-1 epoch's full RSL using the same policy engine and
 //     require its verified tip to equal bridge.SHA1HeadOID.
 func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFilePath, sha1RepoPath string, opts ...verifyopts.Option) error {
 	// ── Phase 1: Load and verify the Genesis Bridge JSON ──────────────────────
 	slog.Info("GAP-1 cross-epoch verify: loading Genesis Bridge record...")
-	bridge, err := gitinterface.LoadGenesisBridge(bridgeFilePath)
+	bridge, ledgerEntry, err := r.loadCrossEpochBridge(bridgeFilePath)
 	if err != nil {
-		return fmt.Errorf("cannot load genesis bridge file '%s': %w", bridgeFilePath, err)
+		return err
 	}
+	bridgeSource := fmt.Sprintf("file '%s'", bridgeFilePath)
+	if bridgeFilePath == "" {
+		bridgeSource = fmt.Sprintf("RSL entry %s", ledgerEntry.GetID().String())
+	}
+	slog.Info(fmt.Sprintf("GAP-1 cross-epoch verify: using Genesis Bridge from %s", bridgeSource))
 
 	slog.Info("GAP-1 cross-epoch verify: verifying bridge commitment digest AND SSH signature...")
 	sigResult, err := gitinterface.VerifyGenesisBridgeSignature(bridge)
@@ -239,9 +250,9 @@ func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFil
 		// Distinguish between "no signature" and "bad signature"
 		if errors.Is(err, gitinterface.ErrBridgeNotSigned) {
 			return fmt.Errorf(
-				"GAP-1 security check FAILED: bridge record '%s' has no embedded SSH signature — "+
+				"GAP-1 security check FAILED: bridge from %s has no embedded SSH signature — "+
 					"sign the bridge with 'gittuf bridge create --signing-key <key>' before verifying cross-epoch",
-				bridgeFilePath,
+				bridgeSource,
 			)
 		}
 		return fmt.Errorf("genesis bridge verification failed: %w", err)
@@ -304,6 +315,13 @@ func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFil
 		"GAP-1 SHA-256 anchor check ✔  sha256_rsl_tip=%s  sha256_head=%s",
 		bridge.SHA256RSLTip, bridge.SHA256HeadOID,
 	))
+
+	if ledgerEntry != nil {
+		if err := r.verifyBridgeLedgerPlacement(ledgerEntry); err != nil {
+			return fmt.Errorf("GAP-1 security check FAILED: %w", err)
+		}
+		slog.Info(fmt.Sprintf("GAP-1 in-ledger bridge placement check ✔  entry=%s  parent=%s", ledgerEntry.GetID().String(), bridge.SHA256RSLTip))
+	}
 
 	// ── Phase 4: Verify SHA-1 epoch RSL ──────────────────────────────────────
 	slog.Info("GAP-1 cross-epoch verify: verifying SHA-1 epoch RSL...")
