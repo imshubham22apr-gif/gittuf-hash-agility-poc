@@ -4,9 +4,11 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
@@ -114,10 +116,60 @@ func (vo *verifyOptions) Run(cmd *cobra.Command, args []string) error {
 	cmd.Printf("✅ Commitment digest ✔\n")
 	cmd.Printf("✅ SSH signature valid for the key embedded in the bridge\n")
 	cmd.Printf("   Signer key: %s\n", bridge.SignerPublicKey)
-	cmd.Printf("   Commitment: %s\n\n", bridge.CommitmentDigest)
-	cmd.Printf("⚠️  This does NOT establish trust: anyone can embed their own key.\n")
-	cmd.Printf("   Run 'gittuf verify-ref <ref> --bridge-file <bridge.json> --sha1-repo <path>'\n")
-	cmd.Printf("   to require the signer to be a root key of the SHA-256 repository.\n")
+	cmd.Printf("   Commitment: %s\n", bridge.CommitmentDigest)
+
+	// Root authority: when run inside the SHA-256 repository, the signer must
+	// be one of its root keys.
+	repo, err := gittuf.LoadRepository(".")
+	if err == nil {
+		err = repo.VerifyGenesisBridgeSigner(cmd.Context(), bridge)
+		if err == nil {
+			cmd.Printf("✅ Signer is a root key of this repository ✔\n")
+			cmd.Printf("\n   For the full cross-epoch check run 'gittuf verify-ref <ref> --sha1-repo <path>'.\n")
+			return nil
+		}
+		if errors.Is(err, gittuf.ErrBridgeSignerNotAuthorized) || errors.Is(err, gittuf.ErrBridgeThresholdUnsupported) {
+			return fmt.Errorf("❌ root authority check FAILED: %w", err)
+		}
+	}
+
+	cmd.Printf("\n⚠️  Root authority NOT checked (%v).\n", err)
+	cmd.Printf("   Without that check, anyone can embed their own key. Run this command inside\n")
+	cmd.Printf("   the SHA-256 repository, or run 'gittuf verify-ref <ref> --sha1-repo <path>' there.\n")
+	return nil
+}
+
+type recordOptions struct {
+	bridgeFile string
+}
+
+func (ro *recordOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(
+		&ro.bridgeFile,
+		"file",
+		"f",
+		"genesis-bridge.json",
+		"path to the signed genesis bridge JSON file to record",
+	)
+}
+
+func (ro *recordOptions) Run(cmd *cobra.Command, _ []string) error {
+	bridge, err := gitinterface.LoadGenesisBridge(ro.bridgeFile)
+	if err != nil {
+		return fmt.Errorf("failed to load genesis bridge: %w", err)
+	}
+
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	if err := repo.RecordGenesisBridge(cmd.Context(), bridge, true); err != nil {
+		return fmt.Errorf("❌ failed to record Genesis Bridge in the RSL: %w", err)
+	}
+
+	cmd.Printf("✅ Genesis Bridge recorded in the RSL on top of %s\n", bridge.SHA256RSLTip)
+	cmd.Printf("   Verify with 'gittuf verify-ref <ref> --sha1-repo <path>'.\n")
 	return nil
 }
 
@@ -144,12 +196,24 @@ func New() *cobra.Command {
 	verifyOpt := &verifyOptions{}
 	verifyCmd := &cobra.Command{
 		Use:               "verify",
-		Short:             "Check a Genesis Bridge record's commitment digest and embedded-key signature (does not establish trust)",
+		Short:             "Check a Genesis Bridge record's commitment, signature and, inside the SHA-256 repository, that the signer is a root key",
 		RunE:              verifyOpt.Run,
 		DisableAutoGenTag: true,
 	}
 	verifyOpt.AddFlags(verifyCmd)
 	rootCmd.AddCommand(verifyCmd)
+
+	// Subcommand: gittuf bridge record
+	recordOpt := &recordOptions{}
+	recordCmd := &cobra.Command{
+		Use:               "record",
+		Short:             "Record a signed Genesis Bridge in this (SHA-256) repository's RSL",
+		Long:              "Record a signed Genesis Bridge in this (SHA-256) repository's RSL. The bridge must be signed by a root key of this repository, commit to the current RSL tip, and be the first bridge in the RSL.",
+		RunE:              recordOpt.Run,
+		DisableAutoGenTag: true,
+	}
+	recordOpt.AddFlags(recordCmd)
+	rootCmd.AddCommand(recordCmd)
 
 	return rootCmd
 }

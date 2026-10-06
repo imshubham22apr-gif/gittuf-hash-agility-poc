@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 // a gittuf policy protecting main and one verified commit on main.
 type crossEpochFixture struct {
 	sha256Repo               *Repository
+	sha256RepoPath           string
 	sha1RepoPath             string
 	sha1RSLTip, sha1Head     string
 	sha256RSLTip, sha256Head string
@@ -67,7 +69,8 @@ func newCrossEpochFixture(t *testing.T) *crossEpochFixture {
 
 	sha1RepoPath := t.TempDir()
 	sha1Repo := createTestRepositoryWithRSAPolicy(t, sha1RepoPath, gitinterface.WithObjectFormat(gitinterface.ObjectFormatSHA1))
-	sha256Repo := createTestRepositoryWithRSAPolicy(t, "", gitinterface.WithSHA256Format())
+	sha256RepoPath := t.TempDir()
+	sha256Repo := createTestRepositoryWithRSAPolicy(t, sha256RepoPath, gitinterface.WithSHA256Format())
 
 	record := func(repo *Repository) (string, string) {
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, crossEpochRef, 1, gpgKeyBytes)
@@ -79,7 +82,7 @@ func newCrossEpochFixture(t *testing.T) *crossEpochFixture {
 		return rslTip.String(), commitIDs[0].String()
 	}
 
-	f := &crossEpochFixture{sha256Repo: sha256Repo, sha1RepoPath: sha1RepoPath, bridgeDir: t.TempDir()}
+	f := &crossEpochFixture{sha256Repo: sha256Repo, sha256RepoPath: sha256RepoPath, sha1RepoPath: sha1RepoPath, bridgeDir: t.TempDir()}
 	f.sha1RSLTip, f.sha1Head = record(sha1Repo)
 	f.sha256RSLTip, f.sha256Head = record(sha256Repo)
 
@@ -89,6 +92,19 @@ func newCrossEpochFixture(t *testing.T) *crossEpochFixture {
 	f.sha256UnrelatedCommitOID = unrelated[0].String()
 
 	return f
+}
+
+// copySHA256Repo returns an independent copy of the fixture's SHA-256
+// repository, so a test can change its RSL without affecting other tests.
+func (f *crossEpochFixture) copySHA256Repo(t *testing.T) *Repository {
+	t.Helper()
+
+	dst := filepath.Join(t.TempDir(), "sha256-copy")
+	require.Nil(t, os.CopyFS(dst, os.DirFS(f.sha256RepoPath)))
+
+	repo, err := gitinterface.LoadRepository(dst)
+	require.Nil(t, err)
+	return &Repository{r: repo}
 }
 
 // writeBridge creates, signs and writes a bridge for the given coordinates and

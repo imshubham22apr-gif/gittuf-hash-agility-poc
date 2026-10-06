@@ -169,6 +169,10 @@ echo -e "${BOLD}▶ [5/6] Constructing Genesis Bridge across cryptographic epoch
     --output "../genesis-bridge.json" >/dev/null 2>&1
 echo -e "${GREEN}✔ Genesis Bridge Created (signed by root key):${RESET} ${BRIDGE_FILE}"
 grep -E '(schema_version|sha1_rsl_tip|sha256_rsl_tip|commitment_digest)' "../genesis-bridge.json" | sed 's/^/   /'
+
+# Record the bridge in the SHA-256 RSL (in-ledger binding)
+"${GITTUF_BIN}" bridge record -f "../genesis-bridge.json"
+echo -e "${GREEN}✔ Genesis Bridge recorded in the SHA-256 RSL:${RESET} $(git rev-parse refs/gittuf/reference-state-log)"
 echo
 
 # ------------------------------------------------------------------------------
@@ -177,12 +181,13 @@ echo
 echo -e "${BOLD}▶ [6/6] Verifying Snapshot & Genesis Bridge integrity...${RESET}"
 cd "${SRC_REPO}"
 "${GITTUF_BIN}" snapshot verify -m "../snapshot-manifest.json"
+
+# Inside the SHA-256 repository, 'bridge verify' also checks the signer is a root key
+cd "${DST_REPO}"
 "${GITTUF_BIN}" bridge verify -f "../genesis-bridge.json"
 
-# Establish trust: the bridge signer must be a root key of the SHA-256 repo,
-# and the bridge must bind both epochs' RSL tips and HEADs.
-cd "${DST_REPO}"
-"${GITTUF_BIN}" verify-ref main --bridge-file "../genesis-bridge.json" --sha1-repo "${SRC_REPO}"
+# Full cross-epoch verification using the bridge recorded in the RSL
+"${GITTUF_BIN}" verify-ref main --sha1-repo "${SRC_REPO}"
 
 echo
 echo -e "${BOLD}${GREEN}======================================================================${RESET}"

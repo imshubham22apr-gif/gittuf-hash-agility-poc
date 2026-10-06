@@ -50,32 +50,36 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.bridgeFile,
 		"bridge-file",
 		"",
-		"(GAP-1) path to genesis bridge JSON file — used as cryptographic anchor for cross-epoch RSL verification",
+		"(GAP-1) path to a genesis bridge JSON file; defaults to the Genesis Bridge recorded in the RSL (requires --sha1-repo)",
 	)
 
 	cmd.Flags().StringVar(
 		&o.sha1Repo,
 		"sha1-repo",
 		"",
-		"(GAP-1) path to the prior SHA-1 epoch repository — required when --bridge-file is set",
+		"(GAP-1) path to the prior SHA-1 epoch repository; enables cross-epoch verification",
 	)
-
-	// Both GAP-1 flags must be used together
-	cmd.MarkFlagsRequiredTogether("bridge-file", "sha1-repo")
 
 	// GAP-1 flags are incompatible with latest-only and from-entry
 	cmd.MarkFlagsMutuallyExclusive("bridge-file", "latest-only")
 	cmd.MarkFlagsMutuallyExclusive("bridge-file", "from-entry")
+	cmd.MarkFlagsMutuallyExclusive("sha1-repo", "latest-only")
+	cmd.MarkFlagsMutuallyExclusive("sha1-repo", "from-entry")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
+	if o.bridgeFile != "" && o.sha1Repo == "" {
+		return fmt.Errorf("--bridge-file requires --sha1-repo")
+	}
+
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
 
-	// GAP-1 cross-epoch verify-ref walk
-	if o.bridgeFile != "" {
+	// GAP-1 cross-epoch verify-ref walk; the bridge comes from --bridge-file
+	// or, when that is empty, from the RSL
+	if o.sha1Repo != "" {
 		return repo.VerifyRefCrossEpoch(
 			cmd.Context(),
 			args[0],

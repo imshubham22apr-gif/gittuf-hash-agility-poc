@@ -4,12 +4,9 @@
 package rsl
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
@@ -20,12 +17,18 @@ const (
 	// GenesisBridgeEntryHeader is the commit message header for a GAP-1 Genesis Bridge entry.
 	GenesisBridgeEntryHeader = "RSL Genesis Bridge Entry"
 
-	PriorEpochHashAlgoKey  = "priorEpochHashAlgo"
-	PriorEpochRSLTipKey    = "priorEpochRSLTip"
-	PriorEpochHeadOIDKey   = "priorEpochHeadOID"
-	CurrentEpochHeadOIDKey = "currentEpochHeadOID"
-	CommitmentDigestKey    = "commitmentDigest"
-	FrozenTimestampKey     = "frozenTimestamp"
+	BridgeSchemaVersionKey    = "schemaVersion"
+	PriorEpochHashAlgoKey     = "priorEpochHashAlgo"
+	PriorEpochRSLTipKey       = "priorEpochRSLTip"
+	PriorEpochHeadOIDKey      = "priorEpochHeadOID"
+	CurrentEpochRSLTipKey     = "currentEpochRSLTip"
+	CurrentEpochHeadOIDKey    = "currentEpochHeadOID"
+	CommitmentDigestKey       = "commitmentDigest"
+	FrozenTimestampKey        = "frozenTimestamp"
+	BridgeSignatureKey        = "bridgeSignature"
+	BridgeSignerPublicKeyKey  = "bridgeSignerPublicKey"
+	BridgeDescriptionKey      = "bridgeDescription"
+	defaultPriorEpochHashAlgo = "sha1"
 )
 
 var (
@@ -33,11 +36,21 @@ var (
 	ErrInvalidGenesisBridgeEntry = errors.New("invalid RSL genesis bridge entry")
 )
 
-// GenesisBridgeEntry represents a native RSL entry that links two distinct cryptographic hash epochs
-// (e.g., migrating from SHA-1 to SHA-256). It satisfies the rsl.Entry interface.
+// GenesisBridgeEntry is an RSL entry that records a signed GAP-1 Genesis Bridge
+// in the current (SHA-256) epoch's RSL. It links the prior (SHA-1) epoch's
+// final RSL tip and HEAD to the current epoch's RSL tip and HEAD at migration
+// time. It satisfies the rsl.Entry interface.
+//
+// The entry stores the complete signed bridge record so that a verifier can
+// re-derive the commitment and check the signature from the RSL alone. Being
+// in the RSL does not make the entry trusted: verifiers must still check the
+// commitment, the signature, and that the signer is a root key.
 type GenesisBridgeEntry struct {
 	// ID is the Git commit ID of this entry in the current repository's object format.
 	ID githash.Hash
+
+	// SchemaVersion is the bridge schema version (e.g. "gap1-bridge-v2").
+	SchemaVersion string
 
 	// PriorEpochHashAlgo is the algorithm of the prior epoch (e.g. "sha1").
 	PriorEpochHashAlgo string
@@ -48,51 +61,35 @@ type GenesisBridgeEntry struct {
 	// PriorEpochHeadOID is the tip commit of the default branch in the prior epoch.
 	PriorEpochHeadOID string
 
+	// CurrentEpochRSLTip is the current epoch's RSL tip the bridge commits to.
+	// A correctly recorded entry is this entry's parent in the RSL.
+	CurrentEpochRSLTip string
+
 	// CurrentEpochHeadOID is the migrated tip commit in the new epoch.
 	CurrentEpochHeadOID string
 
-	// CommitmentDigest is the SHA-256 digest binding the two epochs cryptographically.
+	// CommitmentDigest is the SHA-256 digest binding the two epochs.
 	CommitmentDigest string
 
-	// FrozenTimestamp is the UTC timestamp recorded at migration freeze.
+	// FrozenTimestamp is the RFC3339 UTC timestamp recorded at migration freeze.
 	FrozenTimestamp string
+
+	// Signature is the base64 encoding of the armored sshsig signature over
+	// CommitmentDigest.
+	Signature string
+
+	// SignerPublicKey is the authorized_keys formatted SSH public key that
+	// produced Signature.
+	SignerPublicKey string
+
+	// Description is a human-readable note.
+	Description string
 
 	// Number contains the strictly increasing RSL sequence number.
 	Number uint64
 
 	// CustomFields holds any user/application metadata.
 	CustomFields CustomFields
-}
-
-// NewGenesisBridgeEntry constructs an in-memory GenesisBridgeEntry.
-func NewGenesisBridgeEntry(
-	priorEpochHashAlgo, priorEpochRSLTip, priorEpochHeadOID, currentEpochHeadOID string,
-	opts ...EntryOption,
-) (*GenesisBridgeEntry, error) {
-	if priorEpochRSLTip == "" || priorEpochHeadOID == "" || currentEpochHeadOID == "" {
-		return nil, ErrInvalidGenesisBridgeEntry
-	}
-
-	if priorEpochHashAlgo == "" {
-		priorEpochHashAlgo = "sha1"
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	raw := fmt.Sprintf("genesis-bridge|%s|%s|%s|%s|%s", priorEpochHashAlgo, priorEpochRSLTip, priorEpochHeadOID, currentEpochHeadOID, now)
-	h := sha256.Sum256([]byte(raw))
-	commitment := hex.EncodeToString(h[:])
-
-	options := applyEntryOptions(opts)
-
-	return &GenesisBridgeEntry{
-		PriorEpochHashAlgo:  priorEpochHashAlgo,
-		PriorEpochRSLTip:    priorEpochRSLTip,
-		PriorEpochHeadOID:   priorEpochHeadOID,
-		CurrentEpochHeadOID: currentEpochHeadOID,
-		CommitmentDigest:    commitment,
-		FrozenTimestamp:     now,
-		CustomFields:        options.customFields,
-	}, nil
 }
 
 func (e *GenesisBridgeEntry) GetID() githash.Hash {
@@ -149,15 +146,37 @@ func (e *GenesisBridgeEntry) setEntryNumber(storer gitstore.Storer) error {
 }
 
 func (e *GenesisBridgeEntry) createCommitMessage(includeNumber bool) (string, error) {
-	lines := []string{
-		GenesisBridgeEntryHeader,
-		"",
-		fmt.Sprintf("%s: %s", PriorEpochHashAlgoKey, e.PriorEpochHashAlgo),
-		fmt.Sprintf("%s: %s", PriorEpochRSLTipKey, e.PriorEpochRSLTip),
-		fmt.Sprintf("%s: %s", PriorEpochHeadOIDKey, e.PriorEpochHeadOID),
-		fmt.Sprintf("%s: %s", CurrentEpochHeadOIDKey, e.CurrentEpochHeadOID),
-		fmt.Sprintf("%s: %s", CommitmentDigestKey, e.CommitmentDigest),
-		fmt.Sprintf("%s: %s", FrozenTimestampKey, e.FrozenTimestamp),
+	if e.PriorEpochRSLTip == "" || e.PriorEpochHeadOID == "" || e.CurrentEpochHeadOID == "" {
+		return "", ErrInvalidGenesisBridgeEntry
+	}
+
+	priorEpochHashAlgo := e.PriorEpochHashAlgo
+	if priorEpochHashAlgo == "" {
+		priorEpochHashAlgo = defaultPriorEpochHashAlgo
+	}
+
+	lines := []string{GenesisBridgeEntryHeader, ""}
+	appendField := func(key, value string) {
+		if value != "" {
+			lines = append(lines, fmt.Sprintf("%s: %s", key, value))
+		}
+	}
+	appendField(BridgeSchemaVersionKey, e.SchemaVersion)
+	appendField(PriorEpochHashAlgoKey, priorEpochHashAlgo)
+	appendField(PriorEpochRSLTipKey, e.PriorEpochRSLTip)
+	appendField(PriorEpochHeadOIDKey, e.PriorEpochHeadOID)
+	appendField(CurrentEpochRSLTipKey, e.CurrentEpochRSLTip)
+	appendField(CurrentEpochHeadOIDKey, e.CurrentEpochHeadOID)
+	appendField(CommitmentDigestKey, e.CommitmentDigest)
+	appendField(FrozenTimestampKey, e.FrozenTimestamp)
+	appendField(BridgeSignatureKey, e.Signature)
+	appendField(BridgeSignerPublicKeyKey, e.SignerPublicKey)
+	appendField(BridgeDescriptionKey, e.Description)
+
+	for _, line := range lines[2:] {
+		if strings.ContainsAny(line, "\r\n") {
+			return "", fmt.Errorf("%w: field values must be single-line", ErrInvalidGenesisBridgeEntry)
+		}
 	}
 
 	if includeNumber && e.Number > 0 {
@@ -193,18 +212,28 @@ func parseGenesisBridgeEntryText(id githash.Hash, text string) (*GenesisBridgeEn
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
 		switch key {
+		case BridgeSchemaVersionKey:
+			entry.SchemaVersion = value
 		case PriorEpochHashAlgoKey:
 			entry.PriorEpochHashAlgo = value
 		case PriorEpochRSLTipKey:
 			entry.PriorEpochRSLTip = value
 		case PriorEpochHeadOIDKey:
 			entry.PriorEpochHeadOID = value
+		case CurrentEpochRSLTipKey:
+			entry.CurrentEpochRSLTip = value
 		case CurrentEpochHeadOIDKey:
 			entry.CurrentEpochHeadOID = value
 		case CommitmentDigestKey:
 			entry.CommitmentDigest = value
 		case FrozenTimestampKey:
 			entry.FrozenTimestamp = value
+		case BridgeSignatureKey:
+			entry.Signature = value
+		case BridgeSignerPublicKeyKey:
+			entry.SignerPublicKey = value
+		case BridgeDescriptionKey:
+			entry.Description = value
 		case NumberKey:
 			if err := setNumber(&entry.Number, value); err != nil {
 				return nil, err
