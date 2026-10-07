@@ -150,4 +150,8 @@ func TestHashObjectStreamDetectsCollision(t *testing.T) {
 
 	_, err = hashObjectStream(strings.NewReader(""))
 	assert.ErrorIs(t, err, ErrSnapshotNoObjects)
+
+	// Stream with negative object size must be rejected with error
+	_, err = hashObjectStream(strings.NewReader(fmt.Sprintf("%s blob -5\n", collidingOID)))
+	assert.Error(t, err)
 }
