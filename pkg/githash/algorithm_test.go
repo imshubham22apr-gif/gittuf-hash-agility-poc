@@ -92,10 +92,10 @@ func TestDetectAlgorithmFromHex(t *testing.T) {
 		assert.ErrorIs(t, err, ErrUnknownHashAlgorithm)
 	})
 
-	t.Run("128-char hex is unknown (no SHA-512 registered)", func(t *testing.T) {
+	t.Run("invalid non-hex characters is error", func(t *testing.T) {
 		t.Parallel()
-		longHex := "abcdef12345678900987654321fedcbaabcdef12345678900987654321fedcbaabcdef12345678900987654321fedcbaabcdef12345678900987654321fedcba"
-		_, err := DetectAlgorithmFromHex(longHex)
+		invalidHex := "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+		_, err := DetectAlgorithmFromHex(invalidHex)
 		assert.ErrorIs(t, err, ErrUnknownHashAlgorithm)
 	})
 }
