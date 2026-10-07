@@ -146,7 +146,7 @@ func (e *GenesisBridgeEntry) setEntryNumber(storer gitstore.Storer) error {
 }
 
 func (e *GenesisBridgeEntry) createCommitMessage(includeNumber bool) (string, error) {
-	if e.PriorEpochRSLTip == "" || e.PriorEpochHeadOID == "" || e.CurrentEpochHeadOID == "" {
+	if e.PriorEpochRSLTip == "" || e.PriorEpochHeadOID == "" || e.CurrentEpochRSLTip == "" || e.CurrentEpochHeadOID == "" {
 		return "", ErrInvalidGenesisBridgeEntry
 	}
 
@@ -245,7 +245,7 @@ func parseGenesisBridgeEntryText(id githash.Hash, text string) (*GenesisBridgeEn
 		}
 	}
 
-	if entry.PriorEpochRSLTip == "" || entry.PriorEpochHeadOID == "" || entry.CurrentEpochHeadOID == "" {
+	if entry.PriorEpochRSLTip == "" || entry.PriorEpochHeadOID == "" || entry.CurrentEpochRSLTip == "" || entry.CurrentEpochHeadOID == "" {
 		return nil, ErrInvalidRSLEntry
 	}
 
