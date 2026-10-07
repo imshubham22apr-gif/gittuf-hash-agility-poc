@@ -20,7 +20,6 @@
 // raw SSH public key are embedded in the JSON record so that any verifier
 // can independently re-derive and check the signature without needing a
 // separate allowed_signers file — they only need the bridge JSON itself.
-
 package gitinterface
 
 import (
@@ -102,8 +101,8 @@ type GenesisBridgeRecord struct {
 	SignerPublicKey string `json:"signer_public_key,omitempty"`
 	// Signatures holds multiple threshold signatures over CommitmentDigest,
 	// allowing repositories requiring k-of-n root approvals to verify natively.
-	Signatures []BridgeSignature `json:"signatures,omitempty"`
-	Description string `json:"description"`
+	Signatures  []BridgeSignature `json:"signatures,omitempty"`
+	Description string            `json:"description"`
 }
 
 // BridgeSignature represents an individual cryptographic signature embedded in a Genesis Bridge.
