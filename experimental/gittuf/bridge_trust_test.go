@@ -180,6 +180,25 @@ func TestVerifyRefCrossEpoch(t *testing.T) {
 		err := f.sha256Repo.VerifyRefCrossEpoch(testCtx, crossEpochRef, path, f.sha1RepoPath)
 		assert.ErrorContains(t, err, "does not match bridge HEAD OID")
 	})
+
+	t.Run("cross-epoch tag reachability peels tag to commit", func(t *testing.T) {
+		// Create a tag pointing to sha256Head
+		headHash, err := gitinterface.NewHash(f.sha256Head)
+		require.Nil(t, err)
+		tagID, err := f.sha256Repo.r.TagUsingSpecificKey(headHash, "v1.0.0", "Release v1.0.0\n", rootKeyBytes)
+		require.Nil(t, err)
+
+		// Verification of reachability for the tag peels tag object to its commit
+		bridge := &gitinterface.GenesisBridgeRecord{
+			SHA256RSLTip:  f.sha256RSLTip,
+			SHA256HeadOID: f.sha256Head,
+		}
+		err = f.sha256Repo.verifyBridgeBindsRepository(bridge, "refs/tags/v1.0.0")
+		assert.Nil(t, err)
+
+		// Unpeeled tag ID itself is a tag object, not a commit, confirming peeling was needed
+		assert.NotEqual(t, tagID.String(), f.sha256Head)
+	})
 }
 
 func TestVerifyBridgeSignerIsRoot(t *testing.T) {

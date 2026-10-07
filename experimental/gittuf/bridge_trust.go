@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	sslibssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -137,7 +138,15 @@ func (r *Repository) verifyBridgeBindsRepository(bridge *gitinterface.GenesisBri
 			return fmt.Errorf("%w: %s: %w", ErrBridgeNotBoundToRepository, check.name, err)
 		}
 
-		knows, err := r.r.KnowsCommit(currentTip, bridgeOID)
+		tipCommit := currentTip
+		if strings.HasPrefix(check.ref, gitinterface.TagRefPrefix) {
+			peeled, err := r.r.PeelToCommit(currentTip)
+			if err == nil {
+				tipCommit = peeled
+			}
+		}
+
+		knows, err := r.r.KnowsCommit(tipCommit, bridgeOID)
 		if err != nil || !knows {
 			return fmt.Errorf("%w: bridge %s %s is not reachable from '%s' (%s)", ErrBridgeNotBoundToRepository, check.name, check.bridgeOID, check.ref, currentTip.String())
 		}
