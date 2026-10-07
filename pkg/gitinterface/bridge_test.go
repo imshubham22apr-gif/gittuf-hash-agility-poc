@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,6 +103,7 @@ func TestVerifyGenesisBridgeTampered(t *testing.T) {
 		"sha256_rsl_tip":  func(b *GenesisBridgeRecord) { b.SHA256RSLTip = strings.Repeat("0", 64) },
 		"sha256_head_oid": func(b *GenesisBridgeRecord) { b.SHA256HeadOID = strings.Repeat("0", 64) },
 		"created_at":      func(b *GenesisBridgeRecord) { b.CreatedAt = b.CreatedAt.Add(1e9) },
+		"zero_timestamp":  func(b *GenesisBridgeRecord) { b.CreatedAt = time.Time{} },
 	}
 
 	for field, apply := range tamper {
