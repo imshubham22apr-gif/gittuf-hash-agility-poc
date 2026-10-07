@@ -43,7 +43,7 @@ func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch root threshold: %w", err)
 	}
-	if threshold > 1 {
+	if threshold != 1 {
 		return fmt.Errorf("%w (threshold %d)", ErrBridgeThresholdUnsupported, threshold)
 	}
 
