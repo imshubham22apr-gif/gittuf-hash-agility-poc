@@ -198,7 +198,7 @@ func bridgeEntryToRecord(entry *rsl.GenesisBridgeEntry) (*gitinterface.GenesisBr
 		return nil, fmt.Errorf("%w: invalid signature encoding: %w", rsl.ErrInvalidGenesisBridgeEntry, err)
 	}
 
-	return &gitinterface.GenesisBridgeRecord{
+	record := &gitinterface.GenesisBridgeRecord{
 		SchemaVersion:    entry.SchemaVersion,
 		CreatedAt:        createdAt.UTC(),
 		SHA1RSLTip:       entry.PriorEpochRSLTip,
@@ -209,5 +209,11 @@ func bridgeEntryToRecord(entry *rsl.GenesisBridgeEntry) (*gitinterface.GenesisBr
 		Signature:        string(signature),
 		SignerPublicKey:  entry.SignerPublicKey,
 		Description:      entry.Description,
-	}, nil
+	}
+	if record.Signature != "" && record.SignerPublicKey != "" {
+		record.Signatures = []gitinterface.BridgeSignature{
+			{Signature: record.Signature, SignerPublicKey: record.SignerPublicKey},
+		}
+	}
+	return record, nil
 }

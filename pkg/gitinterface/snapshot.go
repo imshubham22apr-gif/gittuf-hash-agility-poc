@@ -16,7 +16,6 @@
 //
 // The resulting ContentSHA256 is a single deterministic hash that detects
 // any object-level tampering, even if SHA-1 collisions are exploited.
-
 package gitinterface
 
 import (
@@ -135,7 +134,7 @@ func hashObjectStream(stdOut io.Reader) (string, error) {
 
 		// Compute SHA-256 over canonical Git object: "<type> <size>\0<payload>"
 		h := sha256.New()
-		h.Write([]byte(fmt.Sprintf("%s %d\x00", parts[1], size)))
+		fmt.Fprintf(h, "%s %d\x00", parts[1], size)
 		h.Write(payload)
 		digest := hex.EncodeToString(h.Sum(nil))
 		objectDigests = append(objectDigests, digest)
