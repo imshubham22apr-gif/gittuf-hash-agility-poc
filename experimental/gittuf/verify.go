@@ -267,10 +267,10 @@ func (r *Repository) VerifyRefCrossEpoch(ctx context.Context, refName, bridgeFil
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch policy: %w", err)
 	}
-	if err := verifyBridgeSignerIsRoot(sha256PolicyState, bridge.SignerPublicKey); err != nil {
+	if err := verifyBridgeSignersMeetThreshold(sha256PolicyState, bridge); err != nil {
 		return fmt.Errorf("GAP-1 security check FAILED: %w", err)
 	}
-	slog.Info("GAP-1 bridge signer is a SHA-256 epoch root key ✔")
+	slog.Info("GAP-1 bridge signers meet SHA-256 epoch root threshold ✔")
 
 	// ── Phase 2: Load SHA-1 repo and anchor-check its RSL tip ─────────────────
 	slog.Info(fmt.Sprintf("GAP-1 cross-epoch verify: loading SHA-1 repository from '%s'...", sha1RepoPath))

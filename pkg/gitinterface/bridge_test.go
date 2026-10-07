@@ -196,6 +196,29 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 		_, err = VerifyGenesisBridgeSignature(other)
 		assert.ErrorIs(t, err, ErrBridgeSignatureInvalid)
 	})
+
+	t.Run("multiple threshold signatures round-trip and verify", func(t *testing.T) {
+		t.Parallel()
+
+		key1 := newTestSSHKey(t)
+		key2 := newTestSSHKey(t)
+
+		bridge := newTestBridge(t)
+		require.Nil(t, SignGenesisBridge(bridge, key1))
+		require.Nil(t, AddSignature(bridge, key2))
+
+		assert.Len(t, bridge.Signatures, 2)
+
+		path := filepath.Join(t.TempDir(), "multi-bridge.json")
+		require.Nil(t, WriteGenesisBridge(bridge, path))
+		loaded, err := LoadGenesisBridge(path)
+		require.Nil(t, err)
+
+		result, err := VerifyGenesisBridgeSignature(loaded)
+		assert.Nil(t, err)
+		assert.True(t, result.CommitmentOK)
+		assert.True(t, result.SignatureOK)
+	})
 }
 
 func TestWriteAndLoadGenesisBridge(t *testing.T) {

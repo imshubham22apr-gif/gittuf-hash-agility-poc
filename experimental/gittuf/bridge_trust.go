@@ -33,7 +33,10 @@ var (
 // formatted SSH public key, as embedded in the bridge) is one of the root keys
 // in the given policy state. The bridge's own embedded key is only trusted once
 // it is matched against the root of trust the verifier already relies on.
-func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error {
+// verifyBridgeSignersMeetThreshold checks that the signatures on the bridge are
+// from distinct authorized root keys of the SHA-256 epoch's policy and meet the
+// required root threshold.
+func verifyBridgeSignersMeetThreshold(state *policy.State, bridge *gitinterface.GenesisBridgeRecord) error {
 	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch root metadata: %w", err)
@@ -43,8 +46,8 @@ func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch root threshold: %w", err)
 	}
-	if threshold > 1 {
-		return fmt.Errorf("%w (threshold %d)", ErrBridgeThresholdUnsupported, threshold)
+	if threshold < 1 {
+		return fmt.Errorf("%w: invalid root threshold %d", ErrBridgeThresholdUnsupported, threshold)
 	}
 
 	principals, err := rootMetadata.GetRootPrincipals()
@@ -52,21 +55,61 @@ func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error
 		return fmt.Errorf("cannot load SHA-256 epoch root principals: %w", err)
 	}
 
-	signerKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(signerPublicKey))
-	if err != nil {
-		return fmt.Errorf("%w: cannot parse signer public key: %w", ErrBridgeSignerNotAuthorized, err)
-	}
-	signerKeyVal := base64.StdEncoding.EncodeToString(signerKey.Marshal())
-
-	for _, principal := range principals {
-		for _, key := range principal.Keys() {
-			if key.KeyType == sslibssh.KeyType && key.KeyVal.Public == signerKeyVal {
-				return nil
+	// Extract all unique public key strings from the bridge record
+	signerKeys := make(map[string]bool)
+	if len(bridge.Signatures) > 0 {
+		for _, s := range bridge.Signatures {
+			if s.SignerPublicKey != "" {
+				signerKeys[s.SignerPublicKey] = true
 			}
+		}
+	} else if bridge.SignerPublicKey != "" {
+		signerKeys[bridge.SignerPublicKey] = true
+	}
+
+	if len(signerKeys) == 0 {
+		return ErrBridgeSignerNotAuthorized
+	}
+
+	validRootSigners := make(map[string]bool)
+	for signerKeyStr := range signerKeys {
+		signerKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(signerKeyStr))
+		if err != nil {
+			return fmt.Errorf("%w: cannot parse signer public key: %w", ErrBridgeSignerNotAuthorized, err)
+		}
+		signerKeyVal := base64.StdEncoding.EncodeToString(signerKey.Marshal())
+
+		isRoot := false
+		for _, principal := range principals {
+			for _, key := range principal.Keys() {
+				if key.KeyType == sslibssh.KeyType && key.KeyVal.Public == signerKeyVal {
+					validRootSigners[signerKeyVal] = true
+					isRoot = true
+					break
+				}
+			}
+			if isRoot {
+				break
+			}
+		}
+		if !isRoot {
+			return fmt.Errorf("%w: %s", ErrBridgeSignerNotAuthorized, ssh.FingerprintSHA256(signerKey))
 		}
 	}
 
-	return fmt.Errorf("%w: %s", ErrBridgeSignerNotAuthorized, ssh.FingerprintSHA256(signerKey))
+	if len(validRootSigners) < threshold {
+		return fmt.Errorf("%w: bridge has %d valid root signatures, but root threshold is %d", ErrBridgeThresholdUnsupported, len(validRootSigners), threshold)
+	}
+
+	return nil
+}
+
+// verifyBridgeSignerIsRoot checks that signerPublicKey (an authorized_keys
+// formatted SSH public key, as embedded in the bridge) is one of the root keys
+// in the given policy state.
+func verifyBridgeSignerIsRoot(state *policy.State, signerPublicKey string) error {
+	bridge := &gitinterface.GenesisBridgeRecord{SignerPublicKey: signerPublicKey}
+	return verifyBridgeSignersMeetThreshold(state, bridge)
 }
 
 // verifyBridgeBindsRepository checks that the bridge's SHA-256 coordinates
