@@ -54,7 +54,7 @@ jobs:
         persist-credentials: false
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@8b0f1a8fc0ea0def307835c258940ca358fe6480
+      uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff
       with:
         usesh: true
         prepare: |
