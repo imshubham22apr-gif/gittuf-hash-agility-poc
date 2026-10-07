@@ -120,23 +120,21 @@ func hashObjectStream(stdOut io.Reader) (string, error) {
 			continue
 		}
 		size, err := strconv.ParseInt(parts[2], 10, 64)
-		if err != nil {
+		if err != nil || size < 0 {
 			return "", fmt.Errorf("invalid object size in stream: %w", err)
 		}
 
-		// Read payload of length size
-		payload := make([]byte, size)
-		if _, err := io.ReadFull(reader, payload); err != nil {
+		// Compute SHA-256 over canonical Git object: "<type> <size>\0<payload>"
+		// Stream the payload directly to prevent high memory usage on large objects
+		h := sha256.New()
+		h.Write([]byte(fmt.Sprintf("%s %d\x00", parts[1], size)))
+		if _, err := io.CopyN(h, reader, size); err != nil {
 			return "", fmt.Errorf("error reading object payload: %w", err)
 		}
 
 		// Read trailing newline emitted by cat-file --batch
 		_, _ = reader.ReadByte()
 
-		// Compute SHA-256 over canonical Git object: "<type> <size>\0<payload>"
-		h := sha256.New()
-		h.Write([]byte(fmt.Sprintf("%s %d\x00", parts[1], size)))
-		h.Write(payload)
 		digest := hex.EncodeToString(h.Sum(nil))
 		objectDigests = append(objectDigests, digest)
 	}
