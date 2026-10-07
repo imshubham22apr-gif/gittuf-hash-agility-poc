@@ -52,6 +52,7 @@ func TestGenesisBridgeEntryValidation(t *testing.T) {
 	tests := map[string]func(e *GenesisBridgeEntry){
 		"missing prior RSL tip":    func(e *GenesisBridgeEntry) { e.PriorEpochRSLTip = "" },
 		"missing prior head":       func(e *GenesisBridgeEntry) { e.PriorEpochHeadOID = "" },
+		"missing current RSL tip":  func(e *GenesisBridgeEntry) { e.CurrentEpochRSLTip = "" },
 		"missing current head":     func(e *GenesisBridgeEntry) { e.CurrentEpochHeadOID = "" },
 		"multi-line signature":     func(e *GenesisBridgeEntry) { e.Signature = "line1\nline2" },
 		"multi-line description":   func(e *GenesisBridgeEntry) { e.Description = "a\r\nb" },
