@@ -100,7 +100,16 @@ type GenesisBridgeRecord struct {
 	// of the key that produced Signature. Embedded so verifiers need only
 	// the bridge JSON — no external allowed_signers file required.
 	SignerPublicKey string `json:"signer_public_key,omitempty"`
-	Description     string `json:"description"`
+	// Signatures holds multiple threshold signatures over CommitmentDigest,
+	// allowing repositories requiring k-of-n root approvals to verify natively.
+	Signatures []BridgeSignature `json:"signatures,omitempty"`
+	Description string `json:"description"`
+}
+
+// BridgeSignature represents an individual cryptographic signature embedded in a Genesis Bridge.
+type BridgeSignature struct {
+	Signature       string `json:"signature"`
+	SignerPublicKey string `json:"signer_public_key"`
 }
 
 // BridgeVerificationResult holds the output of VerifyGenesisBridge and
@@ -212,11 +221,48 @@ func SignGenesisBridge(bridge *GenesisBridgeRecord, pemPrivateKeyBytes []byte) e
 	}
 
 	// Embed armored signature
-	bridge.Signature = string(sshsig.Armor(sig))
+	armoredSig := string(sshsig.Armor(sig))
+	pubKeyLine := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer.PublicKey())))
 
-	// Embed the raw public key line so verifiers don't need an external file
-	pubKey := signer.PublicKey()
-	bridge.SignerPublicKey = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pubKey)))
+	bridge.Signature = armoredSig
+	bridge.SignerPublicKey = pubKeyLine
+	bridge.Signatures = []BridgeSignature{
+		{Signature: armoredSig, SignerPublicKey: pubKeyLine},
+	}
+
+	return nil
+}
+
+// AddSignature signs the bridge's CommitmentDigest using an additional SSH private key
+// and appends the signature to the record.
+func AddSignature(bridge *GenesisBridgeRecord, pemPrivateKeyBytes []byte) error {
+	if bridge.CommitmentDigest == "" {
+		return fmt.Errorf("%w: CommitmentDigest is empty, cannot sign", ErrBridgeMissingField)
+	}
+
+	signer, err := ssh.ParsePrivateKey(pemPrivateKeyBytes)
+	if err != nil {
+		return fmt.Errorf("cannot parse SSH private key: %w", err)
+	}
+
+	payload := strings.NewReader(bridge.CommitmentDigest)
+	sig, err := sshsig.Sign(payload, signer, sshsig.HashSHA512, bridgeSigNamespace)
+	if err != nil {
+		return fmt.Errorf("sshsig signing failed: %w", err)
+	}
+
+	armoredSig := string(sshsig.Armor(sig))
+	pubKeyLine := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer.PublicKey())))
+
+	if bridge.Signature == "" {
+		bridge.Signature = armoredSig
+		bridge.SignerPublicKey = pubKeyLine
+	}
+
+	bridge.Signatures = append(bridge.Signatures, BridgeSignature{
+		Signature:       armoredSig,
+		SignerPublicKey: pubKeyLine,
+	})
 
 	return nil
 }
@@ -272,37 +318,54 @@ func VerifyGenesisBridgeSignature(bridge *GenesisBridgeRecord) (*BridgeVerificat
 		return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
 	}
 
-	// Step 2: Check that signature is present
-	if bridge.Signature == "" || bridge.SignerPublicKey == "" {
+	// Step 2: Check that signatures are present
+	var sigs []BridgeSignature
+	if bridge.Signature != "" && bridge.SignerPublicKey != "" {
+		sigs = append(sigs, BridgeSignature{
+			Signature:       bridge.Signature,
+			SignerPublicKey: bridge.SignerPublicKey,
+		})
+	}
+	for _, s := range bridge.Signatures {
+		if s.Signature != bridge.Signature || s.SignerPublicKey != bridge.SignerPublicKey {
+			sigs = append(sigs, s)
+		}
+	}
+	if len(sigs) == 0 {
 		result.SignatureSkipped = true
 		return result, ErrBridgeNotSigned
 	}
 
-	// Step 3: Parse embedded public key
-	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(bridge.SignerPublicKey))
-	if err != nil {
-		result.ErrorDetail = fmt.Sprintf("cannot parse embedded signer public key: %v", err)
-		return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
-	}
+	// Step 3-5: Verify each signature against the CommitmentDigest
+	for i, s := range sigs {
+		if s.Signature == "" || s.SignerPublicKey == "" {
+			result.ErrorDetail = fmt.Sprintf("signature entry %d is missing signature or public key", i)
+			return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
+		}
 
-	// Step 4: Parse armored sshsig signature
-	sig, err := sshsig.Unarmor([]byte(bridge.Signature))
-	if err != nil {
-		result.ErrorDetail = fmt.Sprintf("cannot parse bridge signature: %v", err)
-		return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
-	}
+		pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(s.SignerPublicKey))
+		if err != nil {
+			result.ErrorDetail = fmt.Sprintf("cannot parse embedded signer public key (%d): %v", i, err)
+			return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
+		}
 
-	// Step 5: Verify — payload is the CommitmentDigest hex string bytes
-	err = sshsig.Verify(
-		bytes.NewReader([]byte(bridge.CommitmentDigest)),
-		sig,
-		pubKey,
-		sshsig.HashSHA512,
-		bridgeSigNamespace,
-	)
-	if err != nil {
-		result.ErrorDetail = fmt.Sprintf("sshsig verification failed: %v", err)
-		return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
+		sig, err := sshsig.Unarmor([]byte(s.Signature))
+		if err != nil {
+			result.ErrorDetail = fmt.Sprintf("cannot parse bridge signature (%d): %v", i, err)
+			return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
+		}
+
+		err = sshsig.Verify(
+			bytes.NewReader([]byte(bridge.CommitmentDigest)),
+			sig,
+			pubKey,
+			sshsig.HashSHA512,
+			bridgeSigNamespace,
+		)
+		if err != nil {
+			result.ErrorDetail = fmt.Sprintf("sshsig verification failed (%d): %v", i, err)
+			return result, fmt.Errorf("%w: %s", ErrBridgeSignatureInvalid, result.ErrorDetail)
+		}
 	}
 
 	result.SignatureOK = true

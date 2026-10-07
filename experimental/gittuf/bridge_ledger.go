@@ -83,7 +83,7 @@ func (r *Repository) VerifyGenesisBridgeSigner(ctx context.Context, bridge *giti
 		return fmt.Errorf("cannot load policy: %w", err)
 	}
 
-	return verifyBridgeSignerIsRoot(state, bridge.SignerPublicKey)
+	return verifyBridgeSignersMeetThreshold(state, bridge)
 }
 
 // loadCrossEpochBridge returns the bridge to verify and, if the RSL has one,

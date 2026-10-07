@@ -210,7 +210,7 @@ func TestVerifyBridgeSignerIsRoot(t *testing.T) {
 		assert.ErrorIs(t, verifyBridgeSignerIsRoot(state, "not a key"), ErrBridgeSignerNotAuthorized)
 	})
 
-	t.Run("root threshold above one fails closed", func(t *testing.T) {
+	t.Run("root threshold above 1 fails closed", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
 		secondKey := tufv01.NewKeyFromSSLibKey(sslibssh.NewKeyFromBytes(t, targetsPubKeyBytes))
@@ -222,5 +222,26 @@ func TestVerifyBridgeSignerIsRoot(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.ErrorIs(t, verifyBridgeSignerIsRoot(state, rootAuthorizedKey), ErrBridgeThresholdUnsupported)
+	})
+
+	t.Run("root threshold above 1 succeeds with multi-sig", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		secondKey := tufv01.NewKeyFromSSLibKey(sslibssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+		require.Nil(t, r.AddRootKey(testCtx, rootSigner, secondKey, false))
+		require.Nil(t, r.UpdateRootThreshold(testCtx, rootSigner, 2, false))
+		require.Nil(t, r.StagePolicy(testCtx, "", true, false))
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		bridge := &gitinterface.GenesisBridgeRecord{
+			Signatures: []gitinterface.BridgeSignature{
+				{SignerPublicKey: rootAuthorizedKey, Signature: "sig1"},
+				{SignerPublicKey: string(targetsPubKeyBytes), Signature: "sig2"},
+			},
+		}
+
+		assert.Nil(t, verifyBridgeSignersMeetThreshold(state, bridge))
 	})
 }
