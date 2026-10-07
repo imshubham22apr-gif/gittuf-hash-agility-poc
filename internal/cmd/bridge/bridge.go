@@ -181,6 +181,73 @@ func (ro *recordOptions) Run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+type signOptions struct {
+	bridgeFile string
+	signingKey string
+	outputFile string
+}
+
+func (so *signOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(
+		&so.bridgeFile,
+		"file",
+		"f",
+		"genesis-bridge.json",
+		"path to existing genesis bridge JSON file to sign",
+	)
+	cmd.Flags().StringVarP(
+		&so.signingKey,
+		"signing-key",
+		"k",
+		"",
+		"path to SSH private key used to co-sign the bridge record",
+	)
+	cmd.Flags().StringVarP(
+		&so.outputFile,
+		"output",
+		"o",
+		"",
+		"optional output path (defaults to updating --file in-place)",
+	)
+
+	_ = cmd.MarkFlagRequired("signing-key")
+}
+
+func (so *signOptions) Run(cmd *cobra.Command, _ []string) error {
+	bridge, err := gitinterface.LoadGenesisBridge(so.bridgeFile)
+	if err != nil {
+		return fmt.Errorf("failed to load genesis bridge '%s': %w", so.bridgeFile, err)
+	}
+
+	pemBytes, err := os.ReadFile(so.signingKey)
+	if err != nil {
+		return fmt.Errorf("cannot read signing key '%s': %w", so.signingKey, err)
+	}
+
+	if bridge.Signature == "" {
+		if err := gitinterface.SignGenesisBridge(bridge, pemBytes); err != nil {
+			return fmt.Errorf("failed to sign genesis bridge: %w", err)
+		}
+	} else {
+		if err := gitinterface.AddSignature(bridge, pemBytes); err != nil {
+			return fmt.Errorf("failed to append signature to genesis bridge: %w", err)
+		}
+	}
+
+	targetPath := so.outputFile
+	if targetPath == "" {
+		targetPath = so.bridgeFile
+	}
+
+	if err := gitinterface.WriteGenesisBridge(bridge, targetPath); err != nil {
+		return fmt.Errorf("failed to write updated genesis bridge: %w", err)
+	}
+
+	cmd.Printf("✅ Appended signature to Genesis Bridge (%d total signature(s))\n", len(bridge.Signatures))
+	cmd.Printf("   Updated file: %s\n", targetPath)
+	return nil
+}
+
 func New() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:               "bridge",
@@ -199,6 +266,18 @@ func New() *cobra.Command {
 	}
 	createOpt.AddFlags(createCmd)
 	rootCmd.AddCommand(createCmd)
+
+	// Subcommand: gittuf bridge sign
+	signOpt := &signOptions{}
+	signCmd := &cobra.Command{
+		Use:               "sign",
+		Short:             "Append a cryptographic signature to an existing Genesis Bridge record",
+		Long:              "Append an SSH signature to an existing Genesis Bridge record. Enables asynchronous multi-party root threshold signing across independent maintainer machines.",
+		RunE:              signOpt.Run,
+		DisableAutoGenTag: true,
+	}
+	signOpt.AddFlags(signCmd)
+	rootCmd.AddCommand(signCmd)
 
 	// Subcommand: gittuf bridge verify
 	verifyOpt := &verifyOptions{}
