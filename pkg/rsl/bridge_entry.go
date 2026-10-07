@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
@@ -247,6 +248,15 @@ func parseGenesisBridgeEntryText(id githash.Hash, text string) (*GenesisBridgeEn
 
 	if entry.PriorEpochRSLTip == "" || entry.PriorEpochHeadOID == "" || entry.CurrentEpochHeadOID == "" {
 		return nil, ErrInvalidRSLEntry
+	}
+
+	if entry.FrozenTimestamp != "" {
+		parsedTime, err := time.Parse(time.RFC3339, entry.FrozenTimestamp)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid RFC3339 frozen timestamp '%s': %w", ErrInvalidGenesisBridgeEntry, entry.FrozenTimestamp, err)
+		}
+		// Canonicalize to UTC RFC3339 representation
+		entry.FrozenTimestamp = parsedTime.UTC().Format(time.RFC3339)
 	}
 
 	return entry, nil

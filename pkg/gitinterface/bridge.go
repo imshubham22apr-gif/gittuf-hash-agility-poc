@@ -68,6 +68,10 @@ var (
 	// ErrBridgeUnsupportedSchema is returned when a bridge record uses a
 	// schema version other than BridgeSchemaVersion.
 	ErrBridgeUnsupportedSchema = errors.New("unsupported bridge schema version")
+
+	// ErrBridgeInvalidTimestamp is returned when a bridge record carries an
+	// unparseable or non-canonical timestamp.
+	ErrBridgeInvalidTimestamp = errors.New("bridge contains an invalid or non-RFC3339 timestamp")
 )
 
 // GenesisBridgeRecord is the canonical link between a SHA-1 epoch's final
@@ -181,6 +185,10 @@ func validateBridgeFields(bridge *GenesisBridgeRecord) error {
 		if _, err := hex.DecodeString(oid.value); err != nil {
 			return fmt.Errorf("%w: %s is not valid hex", ErrBridgeInvalidHash, oid.name)
 		}
+	}
+
+	if bridge.CreatedAt.IsZero() {
+		return fmt.Errorf("%w: created_at timestamp cannot be zero", ErrBridgeInvalidTimestamp)
 	}
 
 	return nil
