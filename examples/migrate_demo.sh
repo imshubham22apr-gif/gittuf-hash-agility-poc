@@ -73,11 +73,14 @@ echo
 # STEP 1: Generate Developer and Root Keys
 # ------------------------------------------------------------------------------
 echo -e "${BOLD}▶ [1/6] Generating cryptographic Ed25519 signing keys...${RESET}"
-ssh-keygen -t ed25519 -N "" -f "${KEYS_DIR}/root" -C "root@demo.gittuf" >/dev/null 2>&1
+ssh-keygen -t ed25519 -N "" -f "${KEYS_DIR}/root" -C "root1@demo.gittuf" >/dev/null 2>&1
+ssh-keygen -t ed25519 -N "" -f "${KEYS_DIR}/root2" -C "root2@demo.gittuf" >/dev/null 2>&1
 ssh-keygen -t ed25519 -N "" -f "${KEYS_DIR}/policy" -C "policy@demo.gittuf" >/dev/null 2>&1
 ssh-keygen -t ed25519 -N "" -f "${KEYS_DIR}/dev" -C "developer@demo.gittuf" >/dev/null 2>&1
 ROOT_FP="$(ssh-keygen -l -f "${KEYS_DIR}/root.pub" | awk '{print $2}')"
-echo -e "${GREEN}✔ Root Key Fingerprint:${RESET} ${ROOT_FP}"
+ROOT2_FP="$(ssh-keygen -l -f "${KEYS_DIR}/root2.pub" | awk '{print $2}')"
+echo -e "${GREEN}✔ Root Key 1 Fingerprint:${RESET} ${ROOT_FP}"
+echo -e "${GREEN}✔ Root Key 2 Fingerprint:${RESET} ${ROOT2_FP}"
 echo
 
 # ------------------------------------------------------------------------------
@@ -139,9 +142,12 @@ git config user.signingkey "../keys/dev.pub"
 (cd "${SRC_REPO}" && git fast-export --all --signed-tags=strip) | git fast-import >/dev/null 2>&1
 git for-each-ref --format="%(refname)" refs/gittuf/ | while read ref; do git update-ref -d "$ref"; done || true
 
-# Initialize fresh trust in SHA-256 epoch
+# Initialize fresh trust in SHA-256 epoch with threshold=2
 "${GITTUF_BIN}" trust init -k "../keys/root" --create-rsl-entry >/dev/null 2>&1
+"${GITTUF_BIN}" trust add-root-key -k "../keys/root" --root-key "../keys/root2.pub" --create-rsl-entry >/dev/null 2>&1
+"${GITTUF_BIN}" trust update-root-threshold -k "../keys/root" --threshold 2 --create-rsl-entry >/dev/null 2>&1
 "${GITTUF_BIN}" trust add-policy-key -k "../keys/root" --policy-key "../keys/policy.pub" --create-rsl-entry >/dev/null 2>&1
+"${GITTUF_BIN}" trust sign -k "../keys/root2" --create-rsl-entry >/dev/null 2>&1
 "${GITTUF_BIN}" policy init -k "../keys/policy" --create-rsl-entry >/dev/null 2>&1
 "${GITTUF_BIN}" policy add-key -k "../keys/policy" --public-key "../keys/dev.pub" --create-rsl-entry >/dev/null 2>&1
 DEV_KEY_ID_DST="$("${GITTUF_BIN}" policy list-principals --policy-ref policy-staging 2>/dev/null | grep -o 'SHA256:[^ :]*' | head -n1 || true)"
@@ -159,7 +165,7 @@ echo
 # ------------------------------------------------------------------------------
 # STEP 5: Create Genesis Bridge Record Linking SHA-1 and SHA-256 Epochs
 # ------------------------------------------------------------------------------
-echo -e "${BOLD}▶ [5/6] Constructing Genesis Bridge across cryptographic epochs...${RESET}"
+echo -e "${BOLD}▶ [5/6] Constructing Genesis Bridge with multi-party threshold signing...${RESET}"
 "${GITTUF_BIN}" bridge create \
     --sha1-rsl "${SHA1_RSL_TIP}" \
     --sha1-head "${SHA1_HEAD}" \
@@ -167,13 +173,20 @@ echo -e "${BOLD}▶ [5/6] Constructing Genesis Bridge across cryptographic epoch
     --sha256-head "${SHA256_HEAD}" \
     --signing-key "../keys/root" \
     --output "../genesis-bridge.json" >/dev/null 2>&1
-echo -e "${GREEN}✔ Genesis Bridge Created (signed by root key):${RESET} ${BRIDGE_FILE}"
+echo -e "${GREEN}✔ Genesis Bridge Created (signed by Root Key 1):${RESET} ${BRIDGE_FILE}"
+
+# Asynchronous ceremony: Root 2 co-signs the bridge file
+"${GITTUF_BIN}" bridge sign \
+    --file "../genesis-bridge.json" \
+    --signing-key "../keys/root2" >/dev/null 2>&1
+echo -e "${GREEN}✔ Genesis Bridge Co-Signed (signed by Root Key 2):${RESET} ${BRIDGE_FILE}"
 grep -E '(schema_version|sha1_rsl_tip|sha256_rsl_tip|commitment_digest)' "../genesis-bridge.json" | sed 's/^/   /'
 
-# Record the bridge in the SHA-256 RSL (in-ledger binding)
+# Record the co-signed bridge in the SHA-256 RSL (in-ledger binding)
 "${GITTUF_BIN}" bridge record -f "../genesis-bridge.json"
 echo -e "${GREEN}✔ Genesis Bridge recorded in the SHA-256 RSL:${RESET} $(git rev-parse refs/gittuf/reference-state-log)"
 echo
+
 
 # ------------------------------------------------------------------------------
 # STEP 6: Full Verification of Snapshot and Genesis Bridge

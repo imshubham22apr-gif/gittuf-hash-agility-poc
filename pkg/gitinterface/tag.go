@@ -102,6 +102,23 @@ func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
 	return hash, nil
 }
 
+// PeelToCommit resolves an object ID or reference to its underlying commit ID.
+// If target is already a commit, it returns it directly. If target is an annotated tag
+// or lightweight tag, it peels through until reaching the underlying commit.
+func (r *Repository) PeelToCommit(target Hash) (Hash, error) {
+	peeledID, err := r.executor("rev-parse", fmt.Sprintf("%s^{commit}", target.String())).executeString()
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to peel object '%s' to commit: %w", target.String(), err)
+	}
+
+	hash, err := NewHash(peeledID)
+	if err != nil {
+		return ZeroHash, fmt.Errorf("invalid format for peeled commit ID '%s': %w", peeledID, err)
+	}
+
+	return hash, nil
+}
+
 func (r *Repository) ensureIsTag(tagID Hash) error {
 	objType, err := r.executor("cat-file", "-t", tagID.String()).executeString()
 	if err != nil {

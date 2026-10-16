@@ -16,7 +16,6 @@
 //
 // The resulting ContentSHA256 is a single deterministic hash that detects
 // any object-level tampering, even if SHA-1 collisions are exploited.
-
 package gitinterface
 
 import (
