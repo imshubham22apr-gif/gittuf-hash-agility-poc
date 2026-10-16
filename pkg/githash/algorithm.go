@@ -6,6 +6,7 @@ package githash
 import (
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -79,6 +80,9 @@ func DetectAlgorithm(raw []byte) (HashAlgorithm, error) {
 // function that accepts *any* valid Git OID hex string and returns the
 // algorithm that produced it.
 func DetectAlgorithmFromHex(hexStr string) (HashAlgorithm, error) {
+	if _, err := hex.DecodeString(hexStr); err != nil {
+		return "", fmt.Errorf("%w: invalid hex encoding: %w", ErrUnknownHashAlgorithm, err)
+	}
 	for algo, size := range knownAlgorithms {
 		if len(hexStr) == size*2 {
 			return algo, nil
