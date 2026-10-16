@@ -47,6 +47,9 @@ func verifyBridgeSignersMeetThreshold(state *policy.State, bridge *gitinterface.
 	if err != nil {
 		return fmt.Errorf("cannot load SHA-256 epoch root threshold: %w", err)
 	}
+	// Root threshold enforcement: verify that the root threshold is at least 1.
+	// If valid signatures meet or exceed the required threshold, verification succeeds;
+	// otherwise verification fails closed with ErrBridgeThresholdUnsupported.
 	if threshold < 1 {
 		return fmt.Errorf("%w: invalid root threshold %d", ErrBridgeThresholdUnsupported, threshold)
 	}
