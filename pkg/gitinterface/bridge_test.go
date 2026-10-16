@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,6 +103,7 @@ func TestVerifyGenesisBridgeTampered(t *testing.T) {
 		"sha256_rsl_tip":  func(b *GenesisBridgeRecord) { b.SHA256RSLTip = strings.Repeat("0", 64) },
 		"sha256_head_oid": func(b *GenesisBridgeRecord) { b.SHA256HeadOID = strings.Repeat("0", 64) },
 		"created_at":      func(b *GenesisBridgeRecord) { b.CreatedAt = b.CreatedAt.Add(1e9) },
+		"zero_timestamp":  func(b *GenesisBridgeRecord) { b.CreatedAt = time.Time{} },
 	}
 
 	for field, apply := range tamper {
@@ -195,6 +197,29 @@ func TestSignAndVerifyGenesisBridgeSignature(t *testing.T) {
 
 		_, err = VerifyGenesisBridgeSignature(other)
 		assert.ErrorIs(t, err, ErrBridgeSignatureInvalid)
+	})
+
+	t.Run("multiple threshold signatures round-trip and verify", func(t *testing.T) {
+		t.Parallel()
+
+		key1 := newTestSSHKey(t)
+		key2 := newTestSSHKey(t)
+
+		bridge := newTestBridge(t)
+		require.Nil(t, SignGenesisBridge(bridge, key1))
+		require.Nil(t, AddSignature(bridge, key2))
+
+		assert.Len(t, bridge.Signatures, 2)
+
+		path := filepath.Join(t.TempDir(), "multi-bridge.json")
+		require.Nil(t, WriteGenesisBridge(bridge, path))
+		loaded, err := LoadGenesisBridge(path)
+		require.Nil(t, err)
+
+		result, err := VerifyGenesisBridgeSignature(loaded)
+		assert.Nil(t, err)
+		assert.True(t, result.CommitmentOK)
+		assert.True(t, result.SignatureOK)
 	})
 }
 
