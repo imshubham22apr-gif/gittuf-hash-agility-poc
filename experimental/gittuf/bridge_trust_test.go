@@ -180,6 +180,25 @@ func TestVerifyRefCrossEpoch(t *testing.T) {
 		err := f.sha256Repo.VerifyRefCrossEpoch(testCtx, crossEpochRef, path, f.sha1RepoPath)
 		assert.ErrorContains(t, err, "does not match bridge HEAD OID")
 	})
+
+	t.Run("cross-epoch tag reachability peels tag to commit", func(t *testing.T) {
+		// Create a tag pointing to sha256Head
+		headHash, err := gitinterface.NewHash(f.sha256Head)
+		require.Nil(t, err)
+		tagID, err := f.sha256Repo.r.TagUsingSpecificKey(headHash, "v1.0.0", "Release v1.0.0\n", rootKeyBytes)
+		require.Nil(t, err)
+
+		// Verification of reachability for the tag peels tag object to its commit
+		bridge := &gitinterface.GenesisBridgeRecord{
+			SHA256RSLTip:  f.sha256RSLTip,
+			SHA256HeadOID: f.sha256Head,
+		}
+		err = f.sha256Repo.verifyBridgeBindsRepository(bridge, "refs/tags/v1.0.0")
+		assert.Nil(t, err)
+
+		// Unpeeled tag ID itself is a tag object, not a commit, confirming peeling was needed
+		assert.NotEqual(t, tagID.String(), f.sha256Head)
+	})
 }
 
 func TestVerifyBridgeSignerIsRoot(t *testing.T) {
@@ -245,3 +264,76 @@ func TestVerifyBridgeSignerIsRoot(t *testing.T) {
 		assert.Nil(t, verifyBridgeSignersMeetThreshold(state, bridge))
 	})
 }
+
+func TestVerifyRefCrossEpochMultiRootThreshold(t *testing.T) {
+	// Create SHA-1 repo with 1 commit and standard policy
+	sha1RepoPath := t.TempDir()
+	sha1Repo := createTestRepositoryWithRSAPolicy(t, sha1RepoPath, gitinterface.WithObjectFormat(gitinterface.ObjectFormatSHA1))
+	commitIDs1 := common.AddNTestCommitsToSpecifiedRef(t, sha1Repo.r, crossEpochRef, 1, gpgKeyBytes)
+	entry1 := rsl.NewReferenceEntry(crossEpochRef, commitIDs1[0])
+	common.CreateTestRSLReferenceEntryCommit(t, sha1Repo.r, entry1, gpgKeyBytes)
+	sha1RSLTipRef, err := sha1Repo.r.GetReference(rsl.Ref)
+	require.Nil(t, err)
+	sha1RSLTip := sha1RSLTipRef.String()
+	sha1Head := commitIDs1[0].String()
+
+	// Create SHA-256 repo with Root Threshold = 2 (rootKey and secondRootKey)
+	sha256RepoPath := t.TempDir()
+	sha256Repo := createTestRepositoryWithRoot(t, sha256RepoPath, gitinterface.WithSHA256Format())
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	// Second root signer (using targetsKeyBytes for testing)
+	secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	secondRootPubKey := tufv01.NewKeyFromSSLibKey(secondSigner.MetadataKey())
+
+	require.Nil(t, sha256Repo.AddRootKey(testCtx, rootSigner, secondRootPubKey, false, trustpolicyopts.WithRSLEntry()))
+	require.Nil(t, sha256Repo.UpdateRootThreshold(testCtx, rootSigner, 2, false, trustpolicyopts.WithRSLEntry()))
+
+	// Policy setup for sha256Repo
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+	require.Nil(t, sha256Repo.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false, trustpolicyopts.WithRSLEntry()))
+	require.Nil(t, sha256Repo.InitializeTargets(testCtx, rootSigner, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	require.Nil(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	require.Nil(t, sha256Repo.AddPrincipalToTargets(testCtx, rootSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false, trustpolicyopts.WithRSLEntry()))
+	require.Nil(t, sha256Repo.AddDelegation(testCtx, rootSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()))
+	// Sign staged root metadata with second root signer to satisfy threshold 2
+	require.Nil(t, sha256Repo.SignRoot(testCtx, secondSigner, false, trustpolicyopts.WithRSLEntry()))
+	require.Nil(t, policy.Apply(testCtx, sha256Repo.r, false))
+
+	commitIDs2 := common.AddNTestCommitsToSpecifiedRef(t, sha256Repo.r, crossEpochRef, 1, gpgKeyBytes)
+	entry2 := rsl.NewReferenceEntry(crossEpochRef, commitIDs2[0])
+	common.CreateTestRSLReferenceEntryCommit(t, sha256Repo.r, entry2, gpgKeyBytes)
+	sha256RSLTipRef, err := sha256Repo.r.GetReference(rsl.Ref)
+	require.Nil(t, err)
+	sha256RSLTip := sha256RSLTipRef.String()
+	sha256Head := commitIDs2[0].String()
+
+	t.Run("fails when signed by only 1 root key", func(t *testing.T) {
+		bridge, err := gitinterface.NewGenesisBridge(sha1RSLTip, sha1Head, sha256RSLTip, sha256Head)
+		require.Nil(t, err)
+		require.Nil(t, gitinterface.SignGenesisBridge(bridge, rootKeyBytes))
+
+		bridgePath := filepath.Join(t.TempDir(), "bridge-single.json")
+		require.Nil(t, gitinterface.WriteGenesisBridge(bridge, bridgePath))
+
+		err = sha256Repo.VerifyRefCrossEpoch(testCtx, crossEpochRef, bridgePath, sha1RepoPath)
+		assert.ErrorIs(t, err, ErrBridgeThresholdUnsupported)
+	})
+
+	t.Run("succeeds when co-signed by both root keys meeting threshold 2", func(t *testing.T) {
+		bridge, err := gitinterface.NewGenesisBridge(sha1RSLTip, sha1Head, sha256RSLTip, sha256Head)
+		require.Nil(t, err)
+		// Co-sign with both root keys
+		require.Nil(t, gitinterface.SignGenesisBridge(bridge, rootKeyBytes))
+		require.Nil(t, gitinterface.AddSignature(bridge, targetsKeyBytes))
+
+		bridgePath := filepath.Join(t.TempDir(), "bridge-multisig.json")
+		require.Nil(t, gitinterface.WriteGenesisBridge(bridge, bridgePath))
+
+		err = sha256Repo.VerifyRefCrossEpoch(testCtx, crossEpochRef, bridgePath, sha1RepoPath)
+		assert.Nil(t, err)
+	})
+}
+

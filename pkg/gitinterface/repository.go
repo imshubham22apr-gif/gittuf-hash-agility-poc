@@ -84,7 +84,9 @@ func (r *Repository) readObjectFormat() (ObjectFormat, error) {
 // mode (extensions.compatObjectFormat). In that mode Git maintains both SHA-1
 // and SHA-256 representations of every object. When InCompatMode() is enabled,
 // it logs a warning and stores the compat object format on the Repository,
-// which makes the Repository read-only (see ErrCompatModeReadOnly).
+// which makes the Repository read-only (see ErrCompatModeReadOnly). All state
+// mutation operations (SetReference, CheckAndSetReference, DeleteReference) return
+// ErrCompatModeReadOnly when isCompatMode is active, strictly prohibiting policy writes.
 // Otherwise, it returns ErrCompatObjectFormatUnsupported. The config file is
 // read directly (without invoking Git) because Git builds without compat
 // support refuse to open such repositories at all.
