@@ -27,6 +27,8 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - scripts$
+      - experimental/hash-agility$
 issues:
   uniq-by-line: false
 formatters:
@@ -40,3 +42,5 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+      - scripts$
+      - experimental/hash-agility$

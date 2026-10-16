@@ -40,7 +40,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (o *options) Run(cmd *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gitinterface.LoadRepository(".")
 	if err != nil {
 		return fmt.Errorf("failed to open git repository: %w", err)
@@ -80,7 +80,7 @@ func (vo *verifyOptions) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (vo *verifyOptions) Run(cmd *cobra.Command, args []string) error {
+func (vo *verifyOptions) Run(cmd *cobra.Command, _ []string) error {
 	manifest, err := gitinterface.LoadSnapshotManifest(vo.manifestFile)
 	if err != nil {
 		return fmt.Errorf("failed to load snapshot manifest: %w", err)
@@ -102,7 +102,17 @@ func (vo *verifyOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("❌ Content SHA-256 MISMATCH! Tampering detected.\n  Expected: %s\n  Actual:   %s", manifest.ContentSHA256, currentContentSHA)
 	}
 
-	cmd.Printf("✅ Verification PASSED: Content SHA-256 matches snapshot (%s)\n", currentContentSHA)
+	if manifest.CommitmentSHA256 != "" {
+		currentCommitment, err := repo.ComputeOIDCommitment(manifest.RootKeyFingerprint)
+		if err != nil {
+			return fmt.Errorf("failed to compute current OID commitment: %w", err)
+		}
+		if currentCommitment != manifest.CommitmentSHA256 {
+			return fmt.Errorf("❌ OID Commitment MISMATCH! Reference state or policy tampering detected.\n  Expected: %s\n  Actual:   %s", manifest.CommitmentSHA256, currentCommitment)
+		}
+	}
+
+	cmd.Printf("✅ Verification PASSED: Content SHA-256 and OID commitment match snapshot (%s)\n", currentContentSHA)
 	return nil
 }
 

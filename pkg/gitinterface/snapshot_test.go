@@ -42,7 +42,7 @@ func TestComputeContentSHA256(t *testing.T) {
 
 	// Must be lowercase hex only
 	for _, c := range digest {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			t.Errorf("digest contains non-hex character: %c", c)
 		}
 	}
@@ -150,4 +150,8 @@ func TestHashObjectStreamDetectsCollision(t *testing.T) {
 
 	_, err = hashObjectStream(strings.NewReader(""))
 	assert.ErrorIs(t, err, ErrSnapshotNoObjects)
+
+	// Stream with negative object size must be rejected with error
+	_, err = hashObjectStream(strings.NewReader(fmt.Sprintf("%s blob -5\n", collidingOID)))
+	assert.Error(t, err)
 }

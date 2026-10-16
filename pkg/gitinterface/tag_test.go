@@ -53,6 +53,35 @@ func TestGetTagTarget(t *testing.T) {
 	})
 }
 
+func TestPeelToCommit(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	treeBuilder := NewTreeBuilder(repo)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+	require.Nil(t, err)
+
+	// Peeling a commit directly returns the commit itself
+	peeledFromCommit, err := repo.PeelToCommit(commitID)
+	assert.Nil(t, err)
+	assert.Equal(t, commitID, peeledFromCommit)
+
+	// Peeling an annotated tag returns its underlying target commit
+	tagID, err := repo.TagUsingSpecificKey(commitID, "v1.0.0", "Release v1.0.0\n", artifacts.SSHED25519Private)
+	require.Nil(t, err)
+
+	peeledFromTag, err := repo.PeelToCommit(tagID)
+	assert.Nil(t, err)
+	assert.Equal(t, commitID, peeledFromTag)
+
+	// Invalid hash returns error
+	_, err = repo.PeelToCommit(ZeroHash)
+	assert.Error(t, err)
+}
+
 func TestRepositoryVerifyTag(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)

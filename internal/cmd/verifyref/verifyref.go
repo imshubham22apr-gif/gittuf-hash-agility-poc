@@ -50,14 +50,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.bridgeFile,
 		"bridge-file",
 		"",
-		"(GAP-1) path to a genesis bridge JSON file; defaults to the Genesis Bridge recorded in the RSL (requires --sha1-repo)",
+		"(GAP-1) path to genesis bridge JSON file; if omitted, defaults to auto-discovering GenesisBridgeEntry in RSL",
 	)
 
 	cmd.Flags().StringVar(
 		&o.sha1Repo,
 		"sha1-repo",
 		"",
-		"(GAP-1) path to the prior SHA-1 epoch repository; enables cross-epoch verification",
+		"(GAP-1) path to the prior SHA-1 epoch repository (required for cross-epoch verification)",
 	)
 
 	// GAP-1 flags are incompatible with latest-only and from-entry
