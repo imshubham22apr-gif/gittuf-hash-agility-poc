@@ -32,7 +32,7 @@ jobs:
         "GOCACHE=D:\gocache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         Write-Host "Go paths moved to D drive successfully"
     - name: Install Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+      uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
@@ -54,7 +54,7 @@ jobs:
         persist-credentials: false
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@8b0f1a8fc0ea0def307835c258940ca358fe6480
+      uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b
       with:
         usesh: true
         prepare: |
